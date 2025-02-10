@@ -1,0 +1,23 @@
+name: Autotest
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  phpstan:
+    runs-on: ubuntu-latest
+    container:
+      image: xakki/laralog-php:8.3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Vendor
+        run: composer install
+
+      - name: Run PHPSTAN
+        run: composer phpstan
+
+      - name: Run CodeStyle check
+        run: composer cs-check

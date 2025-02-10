@@ -1,0 +1,37 @@
+{
+  "name": "xakki/laralog",
+  "version": "0.1",
+  "description": "Laravel log drivers",
+  "type": "library",
+  "tag": "logger",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.3|^8.4",
+    "laravel/framework": "^10|^11",
+    "psr/log": "^3.0"
+  },
+  "require-dev": {
+    "larastan/larastan": "*",
+    "slevomat/coding-standard": "*",
+    "phpunit/phpunit": "*",
+    "squizlabs/php_codesniffer": "*"
+  },
+  "autoload": {
+    "files": ["src/const.php"],
+    "psr-4": {
+      "Xakki\\LaraLog\\": "src/"
+    }
+  },
+  "config": {
+    "preferred-install": "dist",
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  },
+  "scripts": {
+    "phpstan": "phpstan analyse --memory-limit 1G",
+    "cs-check": "phpcs",
+    "cs-fix": "phpcbf"
+  }
+}

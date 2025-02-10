@@ -1,0 +1,9 @@
+
+parameters:
+    parallel:
+        processTimeout: 600.0
+        maximumNumberOfProcesses: 4
+    level: 8
+    paths:
+        - src
+    reportUnmatchedIgnoredErrors: true
