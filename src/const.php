@@ -3,6 +3,8 @@
 if (!defined('DS')) {
     define('DS', DIRECTORY_SEPARATOR);
 }
+define('LOGGER_VER', '0.2');
+
 define('LOGGER_TIME', 'time');
 define('LOGGER_MCTIME', 'mctime');// float seconds 1.000001 sec
 define('LOGGER_MONITORING', 'monitoring');

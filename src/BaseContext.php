@@ -9,10 +9,10 @@ class BaseContext
     public function __invoke(Logger $logger): void
     {
         $data = [
-            'ver' => config('app.version'),
+            'app_ver' => config('app.version'),
         ];
         if (request()) {
-            $data['ip'] = request()->ip();
+            $data['app_ip'] = request()->ip();
         }
         $logger->withContext($data);
     }

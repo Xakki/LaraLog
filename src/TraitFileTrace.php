@@ -5,7 +5,7 @@ namespace Xakki\LaraLog;
 trait TraitFileTrace
 {
     /** @var string[] */
-    private static array $excludedPartials = ['Monolog', 'Logger', 'Illuminate/Log/', 'vendor/laravel'];
+    private static array $excludedPartials = ['Monolog', 'Illuminate/Log/', 'vendor/laravel'];
 
     /**
      * @param array<int,array{function: string, line?: int, file?:string, class?: class-string,
@@ -27,9 +27,10 @@ trait TraitFileTrace
 
     public static function checkExcludePart(string $str): bool
     {
-        return $str == __FILE__ || count(array_filter(self::$excludedPartials, function ($v) use ($str) {
+        return strpos($str, __DIR__) !== false
+            || count(array_filter(self::$excludedPartials, function ($v) use ($str) {
                 return strpos($str, $v) !== false;
-        }));
+            }));
     }
 
     public static function getRelativeFilePath(string $file): string
@@ -44,20 +45,29 @@ trait TraitFileTrace
      * @param int $limit
      * @return string
      */
-    public static function traceToString(array $trace, int $limit = 50): string
+    public static function traceToString(array $trace, int $limit = 50, bool $checkExcludePart = true): string
     {
         $i = 0;
         $newTrace = [];
         foreach ($trace as &$item) {
-            if (! empty($item['file']) && self::checkExcludePart($item['file'])) {
-                continue;
-            }
             $str = '#' . $i++ . ' ';
+
+            $f = false;
+            if (!empty($item['file']) && self::checkExcludePart($item['file'])) {
+                $f = true;
+                if ($checkExcludePart) {
+                    continue;
+                }
+            }
+
             if (! empty($item['file'])) {
                 $str .= self::getRelativeFilePath($item['file']) . ':' . ($item['line'] ?? '');
             }
-            if (! empty($item['class']) || ! empty($item['function'])) {
-                $str .= self::renderTraceWithClass($item);
+
+            if (!$f) {
+                if (! empty($item['class']) || ! empty($item['function'])) {
+                    $str .= self::renderTraceWithClass($item);
+                }
             }
             $newTrace[] = $str;
             if ($i >= $limit) {

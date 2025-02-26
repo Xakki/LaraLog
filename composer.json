@@ -1,6 +1,6 @@
 {
   "name": "xakki/laralog",
-  "version": "0.1",
+  "version": "0.2",
   "description": "Laravel log drivers",
   "type": "library",
   "tag": "logger",
@@ -31,7 +31,7 @@
   },
   "scripts": {
     "phpstan": "phpstan analyse --memory-limit 1G",
-    "cs-check": "phpcs",
-    "cs-fix": "phpcbf"
+    "cs-check": "phpcs -sp --colors",
+    "cs-fix": "phpcbf -p"
   }
 }

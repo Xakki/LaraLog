@@ -42,7 +42,7 @@ class ConsoleFormatter extends LineFormatter
      */
     public function getCliFormat(LogRecord $record): string
     {
-        $format = '[' . $record->datetime->format('H:i:s') . '] '
+        $format = '[%datetime%] '
             . self::cliColor('%channel%', static::COLOR_GRAY_DARK) . '.'
             . self::cliColor('%level_name%', static::CLI_LEVEL_COLOR[$record->level->toRFC5424Level()]);
 
@@ -55,21 +55,6 @@ class ConsoleFormatter extends LineFormatter
         if (!empty($record->extra)) {
             $format .= "\n  " . self::cliColor('%extra%', static::COLOR_BLUE_LIGHT);
         }
-
-//        if (!empty($log['trace'])) {
-//            $output .= "\n    " . self::cliColor(self::textCliPrepare($log['trace']), static::COLOR_GRAY);
-//        } elseif (!empty($log['fileLine'])) {
-//            $output .= "\n  " . self::cliColor($log['fileLine'], static::COLOR_GRAY_DARK);
-//        }
-//
-//        if (!empty($log['exception'])) {
-//            $output .= "\n  Exception: " . self::cliColor($log['exception'] . ' [' . $log['exceptionCode'] . ']',
-// static::COLOR_RED_LIGHT);
-//            $output .= "\n    " . self::cliColor($log['exceptionFile_line'], static::COLOR_GRAY);
-//            if (!empty($log['previousMessage'])) {
-//                $output .= "\n\tPrevious: " . self::cliColor($log['previousMessage'], static::COLOR_GRAY_DARK);
-//            }
-//        }
 
         return $format . PHP_EOL . PHP_EOL;
     }
