@@ -30,8 +30,8 @@ class ExtraProcessor implements ProcessorInterface
             }
         }
 
-        $record->extra['app_name'] = env('APP_NAME');
-        $record->extra['app_env'] = env('APP_ENV');
+        $record->extra['app_name'] = config('app.name');
+        $record->extra['app_env'] = config('app.env');
         $record->extra['app_ver'] = config('app.version');
         $record->extra['log_ver'] = LOGGER_VER;
         $record->extra['host'] = $hostname;

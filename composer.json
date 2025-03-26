@@ -1,6 +1,6 @@
 {
   "name": "xakki/laralog",
-  "version": "0.2",
+  "version": "0.2.1",
   "description": "Laravel log drivers",
   "type": "library",
   "tag": "logger",
@@ -12,6 +12,7 @@
     "psr/log": "^3.0"
   },
   "require-dev": {
+    "ext-sockets": "*",
     "larastan/larastan": "*",
     "slevomat/coding-standard": "*",
     "phpunit/phpunit": "*",
@@ -23,6 +24,11 @@
       "Xakki\\LaraLog\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "Xakki\\LaraLogTests\\": "tests/"
+    }
+  },
   "config": {
     "preferred-install": "dist",
     "allow-plugins": {
@@ -30,8 +36,10 @@
     }
   },
   "scripts": {
-    "phpstan": "phpstan analyse --memory-limit 1G",
-    "cs-check": "phpcs -sp --colors",
-    "cs-fix": "phpcbf -p"
+    "phpstan": "XDEBUG_MODE=off vendor/bin/phpstan analyse --memory-limit 1G -v",
+    "phpstan-clean": "XDEBUG_MODE=off vendor/bin/phpstan clear-result-cache",
+    "cs-check": "XDEBUG_MODE=off vendor/bin/phpcs -sp --colors",
+    "cs-fix": "XDEBUG_MODE=off vendor/bin/phpcbf -p",
+    "phpunit": "XDEBUG_MODE=off vendor/bin/phpunit -c phpunit.xml --no-coverage"
   }
 }

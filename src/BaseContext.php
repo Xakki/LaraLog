@@ -11,7 +11,7 @@ class BaseContext
         $data = [
             'app_ver' => config('app.version'),
         ];
-        if (request()) {
+        if (request()->ip()) {
             $data['app_ip'] = request()->ip();
         }
         $logger->withContext($data);

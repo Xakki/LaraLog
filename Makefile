@@ -10,21 +10,21 @@ composer := $(docker) composer
 docker-login:
 	docker login ${HOST} -u ${DOCKER_USER} -p ${DOCKER_PASS}
 
+docker-push:
+	docker push ${DOCKER_USER}/${TAG}
+
 docker-build:
 	docker pull php:8.3-cli-alpine
 	docker build -t ${DOCKER_USER}/${TAG} .
 
-docker-push:
-	docker push ${DOCKER_USER}/${TAG}
-
 bash:
 	$(docker) bash
 
-composer-install:
-	$(composer) install
+composer-i:
+	$(composer) i
 
-composer-up:
-	$(composer) update $(name)
+composer-u:
+	$(composer) u $(name)
 
 cs-fix:
 	$(composer) cs-fix
@@ -32,8 +32,13 @@ cs-fix:
 cs-check:
 	$(composer) cs-check
 
-test:
-	$(composer) phpunit
-
 phpstan:
 	$(composer) phpstan
+
+phpunit:
+	$(composer) phpunit
+
+test:
+	$(composer) cs-check
+	$(composer) phpstan
+	$(composer) phpunit

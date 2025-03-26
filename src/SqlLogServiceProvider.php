@@ -24,7 +24,7 @@ class SqlLogServiceProvider extends ServiceProvider
                 }
 
                 $bind = '';
-                if (env('APP_DEBUG') && is_array($query->bindings) && count($query->bindings) < 20) {
+                if (env('APP_DEBUG') && count($query->bindings) < 20) {
                     $bind = [];
                     foreach ($query->bindings as $k => $v) {
                         if (is_string($v) && mb_strlen($v) > 512) {

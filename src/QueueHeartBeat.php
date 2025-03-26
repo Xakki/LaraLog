@@ -14,7 +14,7 @@ class QueueHeartBeat
         Queue::popUsing('default', function ($popJobCallback, $queue) use (&$tickLastTime) {
             $tick = (int) env('TICK_LOG', 120);
             if ($tick && (time() - $tickLastTime) > $tick) {
-                logger()?->info('heartbeat: ' . $queue, [\LOGGER_MONITORING => 'queue', \LOGGER_COUNT => 0]);
+                logger()->info('heartbeat: ' . $queue, [\LOGGER_MONITORING => 'queue', \LOGGER_COUNT => 0]);
                 $tickLastTime = time();
             }
             foreach (explode(',', $queue) as $queue) {
@@ -26,7 +26,7 @@ class QueueHeartBeat
         });
 
         Event::listen(function (WorkerStopping $event) {
-            logger()?->info('Queue stop signal: ' . $event->status, [\LOGGER_MONITORING => 'queue-stop', \LOGGER_STATUS => $event->status]);
+            logger()->info('Queue stop signal: ' . $event->status, [\LOGGER_MONITORING => 'queue-stop', \LOGGER_STATUS => $event->status]);
         });
     }
 }

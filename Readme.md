@@ -1,7 +1,21 @@
 
-* [Graylog integration](./docs/Graylog.md)
+# Integration
+
+* [Graylog](./docs/Graylog.md)
+
+
+# Requires
+
+* php: ^8.3|^8.4
+* laravel/framework: ^10|^11
+* psr/log: ^3.0
+
 
 # Install
+
+`composer require xakki/laralog`
+
+# Configure
 
 1. Add `Providers/AppServiceProvider.php`
 
@@ -18,6 +32,14 @@ class AppServiceProvider extends ServiceProvider
 }
 ```
 
+or `bootstrap/app.php`
+
+```php
+    $app->singleton(
+        \Illuminate\Log\LogManager::class,
+        \Xakki\LaraLog\LogManager::class
+    );
+```
 ### Slow SQL query collect
 
 1. Add `Providers/AppServiceProvider.php`
@@ -56,12 +78,11 @@ class AppServiceProvider extends ServiceProvider
             'formatter' => \Xakki\LaraLog\Formatters\CustomFormatter::class,
             'formatter_with' => [
                 'dateFormat' => 'Y-m-d\TH:i:s.uP',
-                // 'logSize' => 1400,
             ],
             'processors' => [
                 \Xakki\LaraLog\Processor\ExtraProcessor::class, 
-                \Xakki\LaraLog\Processor\LoadAverageProcessor::class,
-                \Xakki\LaraLog\Processor\WebProcessor::class
+                \Monolog\Processor\LoadAverageProcessor::class,
+                \Monolog\Processor\WebProcessor::class
             ],
         ],
 ```

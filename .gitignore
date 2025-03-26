@@ -2,3 +2,4 @@
 /vendor/
 .phpcs-cache
 /.env
+/composer.lock
