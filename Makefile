@@ -14,8 +14,8 @@ docker-push:
 	docker push ${DOCKER_USER}/${TAG}
 
 docker-build:
-	docker pull php:8.3-cli-alpine
-	docker build -t ${DOCKER_USER}/${TAG} .
+	docker pull ${PHP_IMAGE}
+	docker build -t ${DOCKER_USER}/${TAG} --build-arg PHP_IMAGE=${PHP_IMAGE} .
 
 bash:
 	$(docker) bash
