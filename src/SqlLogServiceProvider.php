@@ -12,15 +12,29 @@ class SqlLogServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($logStack = config('logging.dailySqlStack')) {
-            $sqlSlowLogMs = (int) config('logging.sqlSlowLogMs');
-            DB::listen(function (QueryExecuted $query) use ($logStack, $sqlSlowLogMs) {
-                $mcTime = (int)($query->time * 1000);
-                if ($sqlSlowLogMs && $sqlSlowLogMs > $mcTime) {
+            $sqlSlowLogAll = (int) config('logging.sqlSlowLogAll');
+            $sqlSlowLogSelect = (int) config('logging.sqlSlowLogForSelect');
+            DB::listen(function (QueryExecuted $query) use ($logStack, $sqlSlowLogAll, $sqlSlowLogSelect) {
+                $milliseconds = (int)($query->time * 1000);
+                if ($sqlSlowLogAll && $sqlSlowLogAll > $milliseconds) {
                     return;
                 }
 
                 if (stripos($query->sql, 'telescope') !== false) {
                     return;
+                }
+                preg_match('/(UPDATE|DELETE FROM|INSERT INTO|FROM)\s+([\w_]+)/ui', $query->sql, $m);
+                $sqlType = $m[1] ?? '';
+                $table = $m[2] ?? '';
+                if ($sqlType == 'FROM') {
+                    $sqlType = 'SELECT';
+                    if ($sqlSlowLogSelect && $sqlSlowLogSelect > $milliseconds) {
+                        return;
+                    }
+                } elseif ($sqlType == 'DELETE FROM') {
+                    $sqlType = 'DELETE';
+                } elseif ($sqlType == 'INSERT INTO') {
+                    $sqlType = 'INSERT';
                 }
 
                 $bind = '';
@@ -35,19 +49,12 @@ class SqlLogServiceProvider extends ServiceProvider
                     $bind = json_encode($query->bindings);
                 }
 
-                $sqlType = 'SELECT';
-                if (stripos($query->sql, 'insert ') === 0) {
-                    $sqlType = 'INSERT';
-                } elseif (stripos($query->sql, 'delete ') === 0) {
-                    $sqlType = 'DELETE';
-                } elseif (stripos($query->sql, 'update ') === 0) {
-                    $sqlType = 'UPDATE';
-                }
                 Log::channel($logStack)->info($query->sql, [
-                    'ms_time' => $mcTime,
+                    'table' => $table,
+                    'millisecond' => $milliseconds,
                     'bindings' => $bind,
                     'tag' => 'sql',
-                    'sqlType' => $sqlType,
+                    'sql_type' => $sqlType,
                 ]);
             });
         }

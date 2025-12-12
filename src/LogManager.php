@@ -120,36 +120,36 @@ class LogManager extends \Illuminate\Log\LogManager
 
     /**
      * @param Level $level
-     * @param \Throwable|string $e
+     * @param string $message
      * @param array<string, mixed> $context
      * @return string
      */
-    public function appendContext(Level $level, string|\Throwable $e, array &$context): string
+    public function appendContext(Level $level, string $message, array &$context): string
     {
         self::contextTypeCorrector($context);
-        if ($e instanceof \Throwable) {
-            $context['exception_class'] = get_class($e);
-            $context['exception_file'] = self::getRelativeFilePath($e->getFile()) . ':' . $e->getLine();
+
+        if (isset($context['exception']) && $context['exception'] instanceof \Throwable) {
+            $e = $context['exception'];
+            $context['exception'] = get_class($e);
             $context['exception_code'] = (int) $e->getCode();
-            $context['exception_trace'] = self::traceToString($e->getTrace(), 30, false);
+            $context['file'] = self::getRelativeFilePath($e->getFile()) . ':' . $e->getLine();
+            $context['trace'] = self::traceToString($e->getTrace(), 30, false);
             if ($e->getPrevious()) {
+                $context['exception_prev'] = get_class($e);
                 $context['exception_prev_message'] = $e->getPrevious()->getMessage();
-                $context['exception_prev_class'] = get_class($e);
                 $context['exception_prev_file'] = self::getRelativeFilePath($e->getPrevious()->getFile()) . ':' . $e->getPrevious()->getLine();
                 $context['exception_prev_code'] = (int) $e->getPrevious()->getCode();
                 $context['exception_prev_trace'] = self::traceToString($e->getPrevious()->getTrace(), 30, false);
             }
-            $message = $e->getMessage();
-        } else {
-            $message = $e;
         }
+
         $context['messageLen'] = mb_strlen($message);
 
         if (empty($context['file'])) {
             $trace = array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40), 1);
             $context['file'] = self::getFileLine($trace);
             /** @phpstan-ignore-next-line */
-            if (empty($context['exception_class']) && $level->value >= Level::Warning) {
+            if (empty($context['trace']) && $level->value >= Level::Warning) {
                 $context['trace'] = self::traceToString($trace, 10);
             }
         }
@@ -165,6 +165,8 @@ class LogManager extends \Illuminate\Log\LogManager
     {
         foreach ($context as $k => &$r) {
             switch ($k) {
+                case 'exception':
+                    continue 2;
                 case \LOGGER_TIME:
                 case \LOGGER_STATUS:
                 case \LOGGER_COUNT:

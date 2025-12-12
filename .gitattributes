@@ -1,4 +1,7 @@
-.git/ export-ignore
-.idea/ export-ignore
-package/ export-ignore
-tests/ export-ignore
+.git export-ignore
+.idea export-ignore
+package export-ignore
+tests export-ignore
+phpstan.neon export-ignore
+phpunit.xml export-ignore
+phpcs.xml export-ignore

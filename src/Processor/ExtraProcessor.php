@@ -24,9 +24,9 @@ class ExtraProcessor implements ProcessorInterface
         static $hostname;
         if (!$hostname) {
             if (is_readable('/etc/hostname')) {
-                $hostname = (string) file_get_contents('/etc/hostname');
+                $hostname = trim((string) file_get_contents('/etc/hostname'));
             } else {
-                $hostname = (string) gethostname();
+                $hostname = trim((string) gethostname());
             }
         }
 
