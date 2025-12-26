@@ -120,16 +120,20 @@ class LogManager extends \Illuminate\Log\LogManager
 
     /**
      * @param Level $level
-     * @param string $message
+     * @param string|\Stringable $message
      * @param array<string, mixed> $context
      * @return string
      */
-    public function appendContext(Level $level, string $message, array &$context): string
+    public function appendContext(Level $level, string|\Stringable $message, array &$context): string
     {
-        self::contextTypeCorrector($context);
-
+        $e = null;
         if (isset($context['exception']) && $context['exception'] instanceof \Throwable) {
             $e = $context['exception'];
+            unset($context['exception']);
+        }
+        self::contextTypeCorrector($context);
+
+        if ($e) {
             $context['exception'] = get_class($e);
             $context['exception_code'] = (int) $e->getCode();
             $context['file'] = self::getRelativeFilePath($e->getFile()) . ':' . $e->getLine();
@@ -165,8 +169,6 @@ class LogManager extends \Illuminate\Log\LogManager
     {
         foreach ($context as $k => &$r) {
             switch ($k) {
-                case 'exception':
-                    continue 2;
                 case \LOGGER_TIME:
                 case \LOGGER_STATUS:
                 case \LOGGER_COUNT:

@@ -1,6 +1,6 @@
 {
   "name": "xakki/laralog",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Laravel log drivers",
   "type": "library",
   "tag": "logger",
