@@ -1,7 +1,8 @@
 
-# Integration
+# Documentation
 
-* [Graylog](./docs/Graylog.md)
+* [Logging Rules](./docs/LoggingRules.md) ([RU](./docs/LoggingRules.ru.md)) — language-agnostic spec for production logging; LaraLog as the reference PHP/Laravel implementation
+* [Graylog integration](./docs/Graylog.md)
 
 
 # Requires
@@ -177,7 +178,7 @@ U can add custom  options, like `LOG_REDIS_PREFIX`, `LOG_REDIS_PORT` and etc
 ```php
 'stack' => [
     'driver' => 'stack',
-    'channels' => ['stderr', 'syslog-udp'],
+    'channels' => ['stderr'],
     //'ignore_exceptions' => true,
 ],
 ```

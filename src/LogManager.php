@@ -2,6 +2,7 @@
 
 namespace Xakki\LaraLog;
 
+use Illuminate\Support\Str;
 use Monolog\Level;
 
 class LogManager extends \Illuminate\Log\LogManager
@@ -126,6 +127,7 @@ class LogManager extends \Illuminate\Log\LogManager
      */
     public function appendContext(Level $level, string|\Stringable $message, array &$context): string
     {
+        // TODO: как определять кто вызвал логирование - прямой вызов, trigger (set_error_handler), исключение (set_exception_handler) или при фатальном завершении скрипта (register_shutdown_function)
         $e = null;
         if (isset($context['exception']) && $context['exception'] instanceof \Throwable) {
             $e = $context['exception'];
@@ -154,11 +156,42 @@ class LogManager extends \Illuminate\Log\LogManager
             $context['file'] = self::getFileLine($trace);
             /** @phpstan-ignore-next-line */
             if (empty($context['trace']) && $level->value >= Level::Warning) {
-                $context['trace'] = self::traceToString($trace, 10);
+                if ($level->value === Level::Warning) {
+                    $limit = 5;
+                } elseif ($level->value === Level::Warning) {
+                    $limit = 10;
+                } else {
+                    $limit = 20;
+                }
+                $context['trace'] = self::traceToString($trace, $limit);
             }
         }
+        if (config('logger.allow_memory', false)) {
+            $context['memory_peak'] = memory_get_peak_usage();
+            $context['memory_usage'] = memory_get_usage();
+        }
+
+        $context['request_id'] = self::getOrCreateRequestId();
 
         return mb_substr($message, 0, $this->messageLimit);
+    }
+
+    public static function getOrCreateRequestId(): string
+    {
+        if (empty($_SERVER['HTTP_REQUEST_ID'])) {
+            if (! empty($_SERVER['HTTP_X_REQUEST_ID'])) {
+                $id = $_SERVER['HTTP_X_REQUEST_ID'];
+            } else {
+                $id = Str::uuid();
+            }
+            $_SERVER['HTTP_REQUEST_ID'] = (string) $id;
+        }
+
+        if (! env('HTTP_REQUEST_ID')) {
+            putenv('HTTP_REQUEST_ID=' . $_SERVER['HTTP_REQUEST_ID']);
+        }
+
+        return $_SERVER['HTTP_REQUEST_ID'];
     }
 
     /**
@@ -167,6 +200,7 @@ class LogManager extends \Illuminate\Log\LogManager
      */
     public static function contextTypeCorrector(array &$context): void
     {
+        // TODO: str2lower & snak_case
         foreach ($context as $k => &$r) {
             switch ($k) {
                 case \LOGGER_TIME:
@@ -183,8 +217,8 @@ class LogManager extends \Illuminate\Log\LogManager
                     continue 2;
             }
             if (
-                str_contains($k, '_id') || str_contains($k, 'Id') || str_contains($k, '_cnt')
-                || str_contains($k, '_count') || str_contains($k, 'Size')
+                str_contains($k, '_id') || str_contains($k, 'cnt')
+                || str_contains($k, 'count') || str_contains($k, 'size')
             ) {
                 $r = (int) $r;
             } elseif (str_contains($k, 'is_') || str_contains($k, 'has_') || str_contains($k, 'flag')) {

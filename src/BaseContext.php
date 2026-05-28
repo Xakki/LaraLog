@@ -8,11 +8,9 @@ class BaseContext
 {
     public function __invoke(Logger $logger): void
     {
-        $data = [
-            'app_ver' => config('app.version'),
-        ];
+        $data = [];
         if (request()->ip()) {
-            $data['app_ip'] = request()->ip();
+            $data['remote_ip'] = request()->ip();
         }
         $logger->withContext($data);
     }

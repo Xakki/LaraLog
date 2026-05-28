@@ -11,30 +11,15 @@ use Monolog\Processor\ProcessorInterface;
 
 class ExtraProcessor implements ProcessorInterface
 {
-    public const string REQUEST_HEADER_NAME = 'X-Request-ID';
     /**
      * @inheritDoc
      */
     public function __invoke(LogRecord $record): LogRecord
     {
-        $record->extra['memory_peak'] = memory_get_peak_usage();
-        $record->extra['memory_usage'] = memory_get_usage();
-        $record->extra['request_id'] = self::getOrCreateRequestId();
-
-        static $hostname;
-        if (!$hostname) {
-            if (is_readable('/etc/hostname')) {
-                $hostname = trim((string) file_get_contents('/etc/hostname'));
-            } else {
-                $hostname = trim((string) gethostname());
-            }
-        }
-
         $record->extra['app_name'] = config('app.name');
         $record->extra['app_env'] = config('app.env');
         $record->extra['app_ver'] = config('app.version');
         $record->extra['log_ver'] = LOGGER_VER;
-        $record->extra['host'] = $hostname;
 
         if (env('TIER')) {
             $record->extra['tier'] = env('TIER');
@@ -48,27 +33,17 @@ class ExtraProcessor implements ProcessorInterface
         if (env('CONTAINER_NAME')) {
             $record->extra['container_name'] = env('CONTAINER_NAME');
         }
+        if (env('HOST_IP')) {
+            $record->extra['host_ip'] = env('HOST_IP');
+        }
+        if (env('HOST_NAME')) {
+            $record->extra['host_name'] = env('HOST_NAME');
+        }
         if (! empty($_SERVER['argv'])) {
             $record->extra['console_argv'] = implode(' ', $_SERVER['argv']);
         }
+
         return $record;
     }
 
-    public static function getOrCreateRequestId(): string
-    {
-        if (empty($_SERVER['HTTP_REQUEST_ID'])) {
-            if (! empty($_SERVER['HTTP_X_REQUEST_ID'])) {
-                $id = $_SERVER['HTTP_X_REQUEST_ID'];
-            } else {
-                $id = Str::uuid();
-            }
-            $_SERVER['HTTP_REQUEST_ID'] = (string) $id;
-        }
-
-        if (! env('HTTP_REQUEST_ID')) {
-            putenv('HTTP_REQUEST_ID=' . $_SERVER['HTTP_REQUEST_ID']);
-        }
-
-        return $_SERVER['HTTP_REQUEST_ID'];
-    }
 }
