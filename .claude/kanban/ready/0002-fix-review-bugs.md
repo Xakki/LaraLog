@@ -123,8 +123,9 @@ B7 coordinate with card `0001` T5 (caller/correlation work).
     (also removed the now-stale `@phpstan-ignore-next-line` — confirms the original comparison
     was knowingly suppressed). Depths 5/10/20, config-overridable.
   - **B7 ✅** `LogManager::resetRequestId()` + `JobProcessing` listener in `LaraLogServiceProvider`.
-  - **B9 ✅** `ExtraProcessor` reads stable fields from `config('logger.*')` (config:cache-safe)
-    once in the constructor; new `config/logger.php` maps them from env() at config-load time.
+  - **B9 ✅** `ExtraProcessor` builds extra once from `config('logger.extra')` (config:cache-safe;
+    `config/logger.php` maps env() at config-load). Trade-off (user choice): extra requires the
+    config present — register the provider or publish config/logger.php, else extra is empty.
   - **B5 ✅** `testInit` rewritten to assert stable substrings; new tests added.
 - ✅ **Verified in docker** (`xakki/laralog-php:8.3`): `cs-check` OK · `phpstan` L8 *No errors* ·
   `phpunit` OK (6 tests, 18 assertions). All B1–B9 addressed and green locally.
