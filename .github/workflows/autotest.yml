@@ -21,3 +21,6 @@ jobs:
 
       - name: Run CodeStyle check
         run: composer cs-check
+
+      - name: Run PHPUnit
+        run: composer phpunit
