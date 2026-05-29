@@ -17,14 +17,20 @@ return [
     // Attach memory_get_usage()/peak to every record.
     'allow_memory' => (bool) env('LOG_ALLOW_MEMORY', false),
 
-    // ---- Stable-per-process fields (spec §4.2 extra). Read once at boot. ----
-    'version'        => env('APP_VERSION'),
-    'tier'           => env('TIER'),
-    'release_tag'    => env('RELEASE_TAG'),
-    'release_time'   => env('RELEASE_TIME'),
-    'container_name' => env('CONTAINER_NAME'),
-    'host_ip'        => env('HOST_IP'),
-    'host_name'      => env('HOST_NAME'),
+    // ---- Stable-per-process fields (spec §4.2 extra). ExtraProcessor dumps this whole
+    //      array onto every record (empty values dropped). Add your own keys freely. ----
+    'extra' => [
+        'app_name'       => env('APP_NAME'),
+        'app_env'        => env('APP_ENV'),
+        'app_ver'        => env('APP_VERSION'),
+        'log_ver'        => LOGGER_VER,
+        'tier'           => env('TIER'),
+        'release_tag'    => env('RELEASE_TAG'),
+        'release_time'   => env('RELEASE_TIME'),
+        'container_name' => env('CONTAINER_NAME'),
+        'host_ip'        => env('HOST_IP'),
+        'host_name'      => env('HOST_NAME'),
+    ],
 
     // ---- Stack trace (spec §3.7 / §4.6) ----
     'trace' => [

@@ -10,10 +10,11 @@ use Monolog\Processor\ProcessorInterface;
 class ExtraProcessor implements ProcessorInterface
 {
     /**
-     * Process-stable fields (spec §4.2) — computed ONCE. Prefer config (captured by
-     * `php artisan config:cache`, so it survives in prod), fall back to env() so the
-     * processor still works standalone when LaraLogServiceProvider isn't registered (B9).
-     * The config-cache-safe path requires publishing config/logger.php.
+     * Process-stable fields (spec §4.2) — built ONCE from `config('logger.extra')`, the whole
+     * array verbatim (empty values dropped). Sourcing from config means env() is read at
+     * config-load time and survives `php artisan config:cache` (B9). Requires the config to be
+     * present — register LaraLogServiceProvider (merges package defaults) or publish
+     * config/logger.php; otherwise `extra` is empty.
      *
      * @var array<string, mixed>
      */
@@ -21,27 +22,14 @@ class ExtraProcessor implements ProcessorInterface
 
     public function __construct()
     {
-        // Key-absent default doesn't fire when mergeConfigFrom sets the key present-but-null,
-        // so use ?: rather than config('logger.version', config('app.version')).
-        $extra = [
-            'app_name' => config('app.name'),
-            'app_env'  => config('app.env'),
-            'app_ver'  => config('logger.version') ?: config('app.version'),
-            'log_ver'  => LOGGER_VER,
-        ];
+        $extra = array_filter(
+            (array) config('logger.extra', []),
+            static fn ($v): bool => $v !== null && $v !== '',
+        );
 
-        $optional = [
-            'tier'           => ['logger.tier', 'TIER'],
-            'release_tag'    => ['logger.release_tag', 'RELEASE_TAG'],
-            'release_time'   => ['logger.release_time', 'RELEASE_TIME'],
-            'container_name' => ['logger.container_name', 'CONTAINER_NAME'],
-            'host_ip'        => ['logger.host_ip', 'HOST_IP'],
-            'host_name'      => ['logger.host_name', 'HOST_NAME'],
-        ];
-        foreach ($optional as $field => [$cfgKey, $envKey]) {
-            if ($value = (config($cfgKey) ?: env($envKey))) {
-                $extra[$field] = $value;
-            }
+        // argv is stable for the process lifetime -> compute here, not per record.
+        if (! empty($_SERVER['argv'])) {
+            $extra['console_argv'] = implode(' ', $_SERVER['argv']);
         }
 
         $this->extra = $extra;
@@ -54,10 +42,6 @@ class ExtraProcessor implements ProcessorInterface
     {
         foreach ($this->extra as $key => $value) {
             $record->extra[$key] = $value;
-        }
-
-        if (! empty($_SERVER['argv'])) {
-            $record->extra['console_argv'] = implode(' ', $_SERVER['argv']);
         }
 
         return $record;

@@ -46,7 +46,7 @@ class LogManagerTest extends AbstractTestCase
 
         $this->assertStringContainsString('testing.WARNING: Test message', $log);
         $this->assertStringContainsString('"test":"context message"', $log);
-        $this->assertStringContainsString('"messageLen":12', $log);
+        $this->assertStringContainsString('"message_len":12', $log);
         $this->assertStringContainsString('"log_type":"logger"', $log);
         $this->assertStringContainsString('"request_id":', $log);
         $this->assertStringContainsString('LogManagerTest.php:', $log);
@@ -103,12 +103,16 @@ class LogManagerTest extends AbstractTestCase
         $this->assertStringContainsString('***', $log);
     }
 
-    public function testExtraProcessorReadsConfigStandalone(): void
+    public function testExtraProcessorDumpsConfigExtra(): void
     {
-        // The documented usage wires ExtraProcessor into a channel WITHOUT the provider —
-        // it must still surface tier/release from config (regression guard for B9).
+        // ExtraProcessor copies config('logger.extra') verbatim; empty values are dropped.
         $this->createApplication();
-        config(['logger.tier' => 'prod', 'logger.release_tag' => 'v1.2.3']);
+        config(['logger.extra' => [
+            'tier'        => 'prod',
+            'release_tag' => 'v1.2.3',
+            'log_ver'     => '0.3',
+            'host_name'   => null,   // unset -> must NOT appear
+        ]]);
 
         $record = new \Monolog\LogRecord(
             new \DateTimeImmutable(),
@@ -120,7 +124,8 @@ class LogManagerTest extends AbstractTestCase
 
         $this->assertSame('prod', $out->extra['tier']);
         $this->assertSame('v1.2.3', $out->extra['release_tag']);
-        $this->assertArrayHasKey('log_ver', $out->extra);
+        $this->assertSame('0.3', $out->extra['log_ver']);
+        $this->assertArrayNotHasKey('host_name', $out->extra);
     }
 
 
