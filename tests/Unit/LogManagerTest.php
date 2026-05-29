@@ -5,32 +5,90 @@ namespace Xakki\LaraLogTests\Unit;
 use Monolog\Processor\LoadAverageProcessor;
 use Monolog\Processor\WebProcessor;
 use Xakki\LaraLog\LogManager;
+use Xakki\LaraLog\Redactor;
+use Xakki\LaraLog\TraitFileTrace;
 use Xakki\LaraLogTests\AbstractTestCase;
 
 class LogManagerTest extends AbstractTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Static caches leak across tests in one process — reset before each.
+        Redactor::flush();
+        TraitFileTrace::flushTraceConfig();
+    }
 
-    public function testInit(): void
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logToFile(string $level, string $message, array $context = [], string $minLevel = 'debug'): string
     {
         $logManager = new LogManager($this->createApplication());
-
         config([
             'logging.default' => 'single',
             'logging.channels.single.path' => $this->getLogPath(),
-            'logging.channels.single.level' => 'notice',
+            'logging.channels.single.level' => $minLevel,
+        ]);
+        $this->clearLog();
+        $logManager->{$level}($message, $context);
+        return $this->getLog();
+    }
+
+    public function testInit(): void
+    {
+        // appendContext now always adds log_type + request_id, and (after the B2 fix) a trace
+        // at >= warning — so assert on stable substrings instead of an exact context match.
+        $log = $this->logToFile('warning', 'Test message', ['test' => 'context message'], 'notice');
+
+        $this->assertStringContainsString('testing.WARNING: Test message', $log);
+        $this->assertStringContainsString('"test":"context message"', $log);
+        $this->assertStringContainsString('"messageLen":12', $log);
+        $this->assertStringContainsString('"log_type":"logger"', $log);
+        $this->assertStringContainsString('"request_id":', $log);
+        $this->assertStringContainsString('LogManagerTest.php:', $log);
+    }
+
+    public function testLogTypeExceptionOnExplicitException(): void
+    {
+        $log = $this->logToFile('error', 'boom', ['exception' => new \RuntimeException('x')]);
+
+        $this->assertStringContainsString('"log_type":"exception"', $log);
+        $this->assertStringContainsString('"exception":"RuntimeException"', $log);
+    }
+
+    public function testCredentialRedactionByKey(): void
+    {
+        $log = $this->logToFile('warning', 'login', [
+            'password' => 'hunter2',
+            'api_key'  => 'sk-live-123',
+            'order_id' => '42',
         ]);
 
-        $this->clearLog();
+        $this->assertStringContainsString('"password":"***"', $log);
+        $this->assertStringContainsString('"api_key":"***"', $log);
+        $this->assertStringNotContainsString('hunter2', $log);
+        $this->assertStringNotContainsString('sk-live-123', $log);
+        // Non-secret typed fields still pass through (order_id -> int).
+        $this->assertStringContainsString('"order_id":42', $log);
+    }
 
-        $mess = 'Test message';
-        $context = ['test'  => 'context message'];
-        $logManager->warning($mess, $context);
+    public function testSnakeCaseOptIn(): void
+    {
+        config(['logger.snake_case' => true]);
+        $log = $this->logToFile('warning', 'msg', ['orderId' => '7']);
 
-        $context['messageLen'] = strlen($mess);
-        $context['file'] = '/tests/Unit/LogManagerTest.php:27';
-        $context = json_encode($context);
+        $this->assertStringContainsString('"order_id":7', $log);
+        $this->assertStringNotContainsString('orderId', $log);
+    }
 
-        $this->assertMatchesRegularExpression("/\[[\d\-\s\:]+\] testing\.WARNING\: $mess $context \n/u",  $this->getLog());
+    public function testTraceAttachedByLevel(): void
+    {
+        $notice = $this->logToFile('notice', 'just a note');
+        $this->assertStringNotContainsString('"trace":', $notice);
+
+        $error = $this->logToFile('error', 'a problem');
+        $this->assertStringContainsString('"trace":', $error);
     }
 
 
