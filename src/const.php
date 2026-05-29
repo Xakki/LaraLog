@@ -11,8 +11,8 @@ define('LOGGER_MONITORING', 'monitoring');
 define('LOGGER_STATUS', 'status');
 define('LOGGER_COUNT', 'count');
 define('LOGGER_SUM', 'sum');
-define('LOGGER_MEMORY', 'memory');
-define('LOGGER_MEMORY_PEAK', 'memoryPeak');
+define('LOGGER_MEMORY', 'memory_usage');
+define('LOGGER_MEMORY_PEAK', 'memory_peak');
 define('LOGGER_TAG', 'tag');
 define('LOGGER_SUCCESS', 'success');
 

@@ -167,8 +167,8 @@ class LogManager extends \Illuminate\Log\LogManager
             }
         }
         if (config('logger.allow_memory', false)) {
-            $context['memory_peak'] = memory_get_peak_usage();
-            $context['memory_usage'] = memory_get_usage();
+            $context[\LOGGER_MEMORY_PEAK] = memory_get_peak_usage();
+            $context[\LOGGER_MEMORY] = memory_get_usage();
         }
 
         $context['request_id'] = self::getOrCreateRequestId();

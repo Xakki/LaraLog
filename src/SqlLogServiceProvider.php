@@ -46,7 +46,7 @@ class SqlLogServiceProvider extends ServiceProvider
                         }
                         $bind[$k] = $v;
                     }
-                    $bind = json_encode($query->bindings);
+                    $bind = json_encode($bind);
                 }
 
                 Log::channel($logStack)->info($query->sql, [

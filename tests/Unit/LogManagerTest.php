@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace AppTests\Unit;
+namespace Xakki\LaraLogTests\Unit;
 
 use Monolog\Processor\LoadAverageProcessor;
 use Monolog\Processor\WebProcessor;
