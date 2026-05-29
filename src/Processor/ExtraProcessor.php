@@ -27,14 +27,15 @@ class ExtraProcessor implements ProcessorInterface
             'log_ver'  => LOGGER_VER,
         ];
 
-        foreach ([
+        $optional = [
             'tier'           => 'logger.tier',
             'release_tag'    => 'logger.release_tag',
             'release_time'   => 'logger.release_time',
             'container_name' => 'logger.container_name',
             'host_ip'        => 'logger.host_ip',
             'host_name'      => 'logger.host_name',
-        ] as $field => $cfgKey) {
+        ];
+        foreach ($optional as $field => $cfgKey) {
             if ($value = config($cfgKey)) {
                 $extra[$field] = $value;
             }

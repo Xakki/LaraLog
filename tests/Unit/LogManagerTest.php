@@ -21,15 +21,17 @@ class LogManagerTest extends AbstractTestCase
 
     /**
      * @param array<string, mixed> $context
+     * @param array<string, mixed> $extraConfig applied AFTER the app is built (createApplication
+     *                                           rebinds the global container, wiping prior config)
      */
-    private function logToFile(string $level, string $message, array $context = [], string $minLevel = 'debug'): string
+    private function logToFile(string $level, string $message, array $context = [], string $minLevel = 'debug', array $extraConfig = []): string
     {
         $logManager = new LogManager($this->createApplication());
-        config([
+        config(array_merge([
             'logging.default' => 'single',
             'logging.channels.single.path' => $this->getLogPath(),
             'logging.channels.single.level' => $minLevel,
-        ]);
+        ], $extraConfig));
         $this->clearLog();
         $logManager->{$level}($message, $context);
         return $this->getLog();
@@ -75,8 +77,7 @@ class LogManagerTest extends AbstractTestCase
 
     public function testSnakeCaseOptIn(): void
     {
-        config(['logger.snake_case' => true]);
-        $log = $this->logToFile('warning', 'msg', ['orderId' => '7']);
+        $log = $this->logToFile('warning', 'msg', ['orderId' => '7'], 'debug', ['logger.snake_case' => true]);
 
         $this->assertStringContainsString('"order_id":7', $log);
         $this->assertStringNotContainsString('orderId', $log);

@@ -233,14 +233,14 @@ class LogManager extends \Illuminate\Log\LogManager
         if (config('logger.snake_case', false)) {
             $normalized = [];
             foreach ($context as $k => $v) {
-                $normalized[is_string($k) ? Str::snake($k) : $k] = $v;
+                $normalized[Str::snake((string) $k)] = $v;
             }
             $context = $normalized;
         }
 
         foreach ($context as $k => &$r) {
             // §2: mask credential-ish fields by key name before anything else.
-            if (is_string($k) && Redactor::shouldRedactKey($k)) {
+            if (Redactor::shouldRedactKey((string) $k)) {
                 $r = Redactor::MASK;
                 continue;
             }
