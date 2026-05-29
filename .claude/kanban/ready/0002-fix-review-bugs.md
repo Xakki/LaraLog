@@ -94,11 +94,22 @@ B7 coordinate with card `0001` T5 (caller/correlation work).
 
 **Acceptance Criteria:**
 - B1–B9 addressed; `make test` green locally **and** in CI (B6).
-- A regression test covering B3 (truncated bindings) and B2 (depth by level).
-- No new `phpstan` (level 8) or `cs-check` violations.
+- B2 regression test: `testTraceDepthIsConfigurable` (depth 1 → `***` truncation marker). ✅
+- B3: covered by **code inspection only** (one-token `$query->bindings`→`$bind` fix). A unit
+  test needs a DB-backed `QueryExecuted` event (`DB::listen`), deferred — *AC amended* (was
+  "regression test covering B3").
+- No new `phpstan` (level 8) or `cs-check` violations. ✅
+
+**Follow-ups noted during review (non-blocking):**
+- `messageLen` stays camelCase even with `snake_case=true` — it's injected *after*
+  `contextTypeCorrector`, so it bypasses normalization (minor §4.7 inconsistency). Same for
+  the other package-added keys (`request_id`, `file`, `trace`, exception_*). Decide whether to
+  snake the internal keys too (would be a field rename).
+- **B7 is a leak fix, not full §5.1.** Each job gets a fresh `request_id` (no more reuse of the
+  first job's id), but cross-queue *propagation* (dispatcher's id → job) is still TODO.
 
 **Execution Log:**
-- 2026-05-29 — quick mechanical fixes applied (working tree, **not committed**):
+- 2026-05-29 — quick mechanical fixes (committed on `feat/resolve-todos-and-review-fixes`):
   - **B1 ✅** `src/Tap/NoContext.php` → `namespace Xakki\LaraLog\Tap;` (verified no external refs).
   - **B3 ✅** `SqlLogServiceProvider.php:49` → `json_encode($bind)` (512-char truncation now effective).
   - **B4 ✅** `tests/Unit/LogManagerTest.php` → `namespace Xakki\LaraLogTests\Unit;`.
