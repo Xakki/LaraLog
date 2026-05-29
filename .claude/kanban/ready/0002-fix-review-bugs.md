@@ -115,8 +115,8 @@ B7 coordinate with card `0001` T5 (caller/correlation work).
   - **B9 ✅** `ExtraProcessor` reads stable fields from `config('logger.*')` (config:cache-safe)
     once in the constructor; new `config/logger.php` maps them from env() at config-load time.
   - **B5 ✅** `testInit` rewritten to assert stable substrings; new tests added.
-- ⏳ **Verification pending — could not run PHP here.** Run `make test` (cs-check + phpstan L8 +
-  phpunit). The new unit tests are unverified hypotheses until then. Card stays in `test/`
-  until green; do not move to `ready/` while unrun.
+- ✅ **Verified in docker** (`xakki/laralog-php:8.3`): `cs-check` OK · `phpstan` L8 *No errors* ·
+  `phpunit` OK (6 tests, 18 assertions). All B1–B9 addressed and green locally.
+- ⏳ For `done`: confirm green **in CI** (push the branch — B6 added the phpunit step) + user sign-off.
 - Note: B9's *correctness* half depends on the published `config/logger.php` (env captured by
   `config:cache`). If an app doesn't publish it, host/release fields fall back to null — documented.

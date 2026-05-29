@@ -101,11 +101,13 @@ The reference implementation does not yet satisfy parts of the spec it ships:
   (framework shutdown handler ordering) — documented in `LogType` + spec.
 - **T6 ✅** `logger.snake_case` (default off) in `contextTypeCorrector`.
 - Docs §3.7 TODO removed (en+ru); Readme config table added.
-- ⏳ **Verification pending** — run `make test`. Card sits in `test/` until green.
-- ⚠ **T5 Option A is the highest-risk, untestable-here change**: it installs global
-  error/exception/shutdown handlers chained to the framework's. Before enabling
-  `capture_handlers` in any real app, exercise error / uncaught-exception / fatal paths and
-  confirm Laravel's rendering + reporting (Sentry/Whoops) still fire.
+- ✅ **Verified in docker** (`xakki/laralog-php:8.3`): cs-check OK · phpstan L8 *No errors* ·
+  phpunit OK (6 tests, 18 assertions). All 6 TODO markers removed from `src`.
+- ⚠ **T5 Option A is NOT covered by the unit tests** (the suite doesn't trigger global PHP
+  error/exception/shutdown handlers). It installs handlers chained to the framework's. Before
+  enabling `capture_handlers` in any real app, exercise error / uncaught-exception / fatal
+  paths and confirm Laravel's rendering + reporting (Sentry/Whoops) still fire.
+- ⏳ For `done`: T5 manual verification + open question Q5 (`db_*` renames) + user sign-off.
 
 ---
 
