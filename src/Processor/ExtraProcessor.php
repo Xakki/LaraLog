@@ -4,46 +4,58 @@ declare(strict_types=1);
 
 namespace Xakki\LaraLog\Processor;
 
-use Illuminate\Support\Str;
-use Monolog\Level;
 use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 
 class ExtraProcessor implements ProcessorInterface
 {
     /**
+     * Process-stable fields (spec §4.2) — computed ONCE. Sourced from config (not env() at
+     * log-time): config is captured by `php artisan config:cache`, so these survive in prod;
+     * a runtime env() returns null once config is cached (B9).
+     *
+     * @var array<string, mixed>
+     */
+    private array $extra;
+
+    public function __construct()
+    {
+        $extra = [
+            'app_name' => config('app.name'),
+            'app_env'  => config('app.env'),
+            'app_ver'  => config('logger.version', config('app.version')),
+            'log_ver'  => LOGGER_VER,
+        ];
+
+        foreach ([
+            'tier'           => 'logger.tier',
+            'release_tag'    => 'logger.release_tag',
+            'release_time'   => 'logger.release_time',
+            'container_name' => 'logger.container_name',
+            'host_ip'        => 'logger.host_ip',
+            'host_name'      => 'logger.host_name',
+        ] as $field => $cfgKey) {
+            if ($value = config($cfgKey)) {
+                $extra[$field] = $value;
+            }
+        }
+
+        $this->extra = $extra;
+    }
+
+    /**
      * @inheritDoc
      */
     public function __invoke(LogRecord $record): LogRecord
     {
-        $record->extra['app_name'] = config('app.name');
-        $record->extra['app_env'] = config('app.env');
-        $record->extra['app_ver'] = config('app.version');
-        $record->extra['log_ver'] = LOGGER_VER;
+        foreach ($this->extra as $key => $value) {
+            $record->extra[$key] = $value;
+        }
 
-        if (env('TIER')) {
-            $record->extra['tier'] = env('TIER');
-        }
-        if (env('RELEASE_TAG')) {
-            $record->extra['release_tag'] = env('RELEASE_TAG');
-        }
-        if (env('RELEASE_TIME')) {
-            $record->extra['release_time'] = env('RELEASE_TIME');
-        }
-        if (env('CONTAINER_NAME')) {
-            $record->extra['container_name'] = env('CONTAINER_NAME');
-        }
-        if (env('HOST_IP')) {
-            $record->extra['host_ip'] = env('HOST_IP');
-        }
-        if (env('HOST_NAME')) {
-            $record->extra['host_name'] = env('HOST_NAME');
-        }
         if (! empty($_SERVER['argv'])) {
             $record->extra['console_argv'] = implode(' ', $_SERVER['argv']);
         }
 
         return $record;
     }
-
 }

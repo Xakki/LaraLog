@@ -41,6 +41,42 @@ or `bootstrap/app.php`
         \Xakki\LaraLog\LogManager::class
     );
 ```
+
+## Configuration (`config/logger.php`)
+
+Register the provider to get config defaults, per-job `request_id` reset, and (opt-in)
+`log_type` capture handlers:
+
+```php
+$this->app->register(\Xakki\LaraLog\LaraLogServiceProvider::class);
+```
+
+Publish the config to tune it:
+
+```
+php artisan vendor:publish --tag=laralog-config
+```
+
+Read **env() inside `config/logger.php`, never at log-time** — config values are baked in by
+`php artisan config:cache`, while a runtime `env()` returns null once config is cached.
+
+| Key | Default | What |
+|---|---|---|
+| `messageLimit` | `3024` | max message length kept |
+| `allow_memory` | `false` | attach `memory_usage` / `memory_peak` |
+| `version`, `tier`, `release_tag`, `release_time`, `container_name`, `host_ip`, `host_name` | from env | stable `extra` fields (§4.2) |
+| `trace.excluded_partials` | `['Monolog','Illuminate/Log/','vendor/']` | frames stripped from `file`/`trace` |
+| `trace.depth` | `warning:5, error:10, critical:20` | stack-trace frames by level (§3.7) |
+| `trace.arg_limit` | `128` | max chars per stringified trace arg |
+| `redact` | `[]` | extra secret needles, **merged** with the built-in denylist (§2) |
+| `snake_case` | `false` | lowercase + snake_case context keys (§4.7); **breaking — opt-in** |
+| `capture_handlers` | `false` | install chained error/exception/shutdown handlers to set `log_type` (§4.3.1) |
+
+> **`capture_handlers`** installs global PHP handlers chained to the framework's. Enable it
+> only after exercising your error / exception / fatal paths — see `docs/LoggingRules.md` §4.3.1.
+> Credential redaction (`redact` + built-ins) is **on by default**; `password`, `token`,
+> `api_key`, `authorization`, `cookie`, … are masked to `***` by field name.
+
 ### Slow SQL query collect
 
 1. Add `Providers/AppServiceProvider.php`
