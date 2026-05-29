@@ -51,9 +51,15 @@ the goal is testable seams, NOT a framework-agnostic rewrite):**
 - B9 closed (config-derived values survive `config:cache`); B7 closed via the request seam.
 - `make test` green; no `phpstan` (level 8) / `cs-check` regressions.
 
+**Status (2026-05-29):** partially pre-empted. B7 and B9 were fixed **tactically** in card
+`0002` (per-job request_id reset; `config/logger.php` + `ExtraProcessor` reading config once),
+and a publishable `config/logger.php` now exists. The **remaining** scope of this card is the
+larger refactor: the `LogConfig` DTO injected into ctors, the `RequestContext` seam, and
+splitting `appendContext`'s dual role into a pure `enrichContext()`. Still in `grooming` —
+not started; needs the open questions answered.
+
 **Open questions:**
-- Scope/sequencing: ship step 1 (config DTO) as a standalone PR first, or the whole refactor
-  together? (Recommend: step 1 alone first — it closes B9 fast.)
-- Do we want a published `config/logger.php` stub (artisan `vendor:publish`), or keep config
-  conventions doc-only in `Readme.md`?
-- Absorb B7/B9 from card `0002` into this card, or fix them tactically there and refactor later?
+- Scope/sequencing: ship the `LogConfig` DTO as a standalone PR first, or the whole refactor
+  (DTO + RequestContext + pure `enrichContext`) together?
+- Now that `config/logger.php` is publishable, is a DTO still worth it, or is reading merged
+  config "once in ctor" (as `ExtraProcessor` now does) good enough?

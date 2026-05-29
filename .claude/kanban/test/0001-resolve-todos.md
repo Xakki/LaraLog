@@ -81,11 +81,31 @@ The reference implementation does not yet satisfy parts of the spec it ships:
    `logger.redact` (merged, not replaced). *(was Q3)*
 4. **Config namespace** — `logger.*` (existing package convention), not `config/logging.php`.
 
-**Open questions:** *(still blocking move to `todo/`)*
-2. **T5 classification mechanism** — see "T5 design — open" below. Needs a decision on approach
-   and on the field name (`log_type` vs an OTel/spec-aligned name).
-5. Scope: should this card also absorb the §4.7 `db_*` prefix renames in `SqlLogServiceProvider`
-   (`millisecond`→`db_time_ms`, `table`→`db_table`), or keep those in card `0002`?
+**Resolved 2026-05-29:**
+2. **T5** — user chose **Option A** (chained handlers, opt-in `logger.capture_handlers`,
+   default OFF) with field name **`log_type`** and spec values `logger|trigger|exception|fatal`.
+
+**Open questions:** *(remaining)*
+5. Scope: §4.7 `db_*` prefix renames in `SqlLogServiceProvider` (`millisecond`→`db_time_ms`,
+   `table`→`db_table`) — **NOT implemented** (breaking field rename, out of TODO scope).
+   Decide: do it (bump/migration) or leave. Currently deferred.
+
+**Execution Log (2026-05-29) — implemented on branch `feat/resolve-todos-and-review-fixes`:**
+- **T1/T2 ✅** `config/logger.php` `trace.{excluded_partials,depth,arg_limit}`; `TraitFileTrace`
+  reads them (cached, `flushTraceConfig()` test seam); `LogManager::traceDepthForLevel()`.
+- **T3/T4 ✅** `Redactor` (built-in denylist on + `logger.redact` merged); by-key masking in
+  `contextTypeCorrector`, by-value (Bearer/JWT/`secret=…`) in trace args. Built-in list trimmed
+  to high-signal needles to avoid false positives (`card`/`pin`/`auth`/`session` excluded).
+- **T5 ✅** `LogType` + `appendContext` stamps `log_type`; handlers installed by
+  `LaraLogServiceProvider` when `capture_handlers=true`. ⚠ `fatal` tagging best-effort
+  (framework shutdown handler ordering) — documented in `LogType` + spec.
+- **T6 ✅** `logger.snake_case` (default off) in `contextTypeCorrector`.
+- Docs §3.7 TODO removed (en+ru); Readme config table added.
+- ⏳ **Verification pending** — run `make test`. Card sits in `test/` until green.
+- ⚠ **T5 Option A is the highest-risk, untestable-here change**: it installs global
+  error/exception/shutdown handlers chained to the framework's. Before enabling
+  `capture_handlers` in any real app, exercise error / uncaught-exception / fatal paths and
+  confirm Laravel's rendering + reporting (Sentry/Whoops) still fire.
 
 ---
 

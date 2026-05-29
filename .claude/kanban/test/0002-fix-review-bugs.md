@@ -106,6 +106,17 @@ B7 coordinate with card `0001` T5 (caller/correlation work).
     `LogManager` now emits via the constants. Output keys unchanged → **not breaking** for log
     consumers. Verified no external refs to the constants before changing their values.
   - ⏳ Not run: `make test` (no PHP in this env, docker-only) — **must run before commit**.
-- Pending: **B2** (depth/enum — ties to card 0001 T1/T2), **B5** (test vs runtime — needs
-  `make phpunit`), **B6** (CI phpunit step), **B7** (request_id leak — ties to 0001 T5),
-  **B9** (`env()` at log-time).
+- 2026-05-29 — remaining fixes applied on branch `feat/resolve-todos-and-review-fixes`:
+  - **B6 ✅** phpunit step added to `.github/workflows/autotest.yml`.
+  - **B2 ✅** `LogManager::traceDepthForLevel()` replaces the broken int-vs-enum block
+    (also removed the now-stale `@phpstan-ignore-next-line` — confirms the original comparison
+    was knowingly suppressed). Depths 5/10/20, config-overridable.
+  - **B7 ✅** `LogManager::resetRequestId()` + `JobProcessing` listener in `LaraLogServiceProvider`.
+  - **B9 ✅** `ExtraProcessor` reads stable fields from `config('logger.*')` (config:cache-safe)
+    once in the constructor; new `config/logger.php` maps them from env() at config-load time.
+  - **B5 ✅** `testInit` rewritten to assert stable substrings; new tests added.
+- ⏳ **Verification pending — could not run PHP here.** Run `make test` (cs-check + phpstan L8 +
+  phpunit). The new unit tests are unverified hypotheses until then. Card stays in `test/`
+  until green; do not move to `ready/` while unrun.
+- Note: B9's *correctness* half depends on the published `config/logger.php` (env captured by
+  `config:cache`). If an app doesn't publish it, host/release fields fall back to null — documented.
