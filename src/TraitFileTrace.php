@@ -4,9 +4,37 @@ namespace Xakki\LaraLog;
 
 trait TraitFileTrace
 {
-    // TODO: use config/logging.php
     /** @var string[] */
-    private static array $excludedPartials = ['Monolog', 'Illuminate/Log/', 'vendor/'];
+    private const DEFAULT_EXCLUDED_PARTIALS = ['Monolog', 'Illuminate/Log/', 'vendor/'];
+
+    /** @var string[]|null */
+    private static ?array $excludedPartials = null;
+
+    private static ?int $traceArgLimit = null;
+
+    /** @return string[] */
+    private static function excludedPartials(): array
+    {
+        if (self::$excludedPartials === null) {
+            self::$excludedPartials = (array) config('logger.trace.excluded_partials', self::DEFAULT_EXCLUDED_PARTIALS);
+        }
+        return self::$excludedPartials;
+    }
+
+    private static function traceArgLimit(): int
+    {
+        if (self::$traceArgLimit === null) {
+            self::$traceArgLimit = (int) config('logger.trace.arg_limit', 128);
+        }
+        return self::$traceArgLimit;
+    }
+
+    /** Test seam: drop cached trace config so a changed config() is re-read. */
+    public static function flushTraceConfig(): void
+    {
+        self::$excludedPartials = null;
+        self::$traceArgLimit = null;
+    }
 
     /**
      * @param array<int,array{function: string, line?: int, file?:string, class?: class-string,
@@ -29,7 +57,7 @@ trait TraitFileTrace
     public static function checkExcludePart(string $str): bool
     {
         return strpos($str, __DIR__) !== false
-            || count(array_filter(self::$excludedPartials, function ($v) use ($str) {
+            || count(array_filter(self::excludedPartials(), function ($v) use ($str) {
                 return strpos($str, $v) !== false;
             }));
     }
@@ -99,6 +127,7 @@ trait TraitFileTrace
     {
         $args = '';
         if (! empty($item['args'])) {
+            $limit = self::traceArgLimit();
             foreach ($item['args'] as &$arg) {
                 if (is_object($arg)) {
                     $arg = get_class($arg);
@@ -107,11 +136,10 @@ trait TraitFileTrace
                 } elseif (is_bool($arg)) {
                     $arg = $arg ? 'T' : 'F';
                 } elseif (is_string($arg)) {
-                    // TODO: dont show credentional (like $excludedPartials ?)
-                    $arg = '"' . mb_substr($arg, 0, 128) . '"';
+                    // Args are positional (no name) -> value-pattern redaction (§2.1).
+                    $arg = '"' . mb_substr(Redactor::redactValue($arg), 0, $limit) . '"';
                 } else {
-                    // TODO: dont show credentional
-                    $arg = mb_substr(var_export($arg, true), 0, 128);
+                    $arg = mb_substr(Redactor::redactValue(var_export($arg, true)), 0, $limit);
                 }
                 $args .= ($arg ? ', ' : '') . $arg;
             }

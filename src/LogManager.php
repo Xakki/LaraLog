@@ -127,12 +127,22 @@ class LogManager extends \Illuminate\Log\LogManager
      */
     public function appendContext(Level $level, string|\Stringable $message, array &$context): string
     {
-        // TODO: как определять кто вызвал логирование - прямой вызов, trigger (set_error_handler), исключение (set_exception_handler) или при фатальном завершении скрипта (register_shutdown_function)
         $e = null;
         if (isset($context['exception']) && $context['exception'] instanceof \Throwable) {
             $e = $context['exception'];
             unset($context['exception']);
         }
+
+        // §4.3.1 log_type: a handler-set origin (trigger/fatal/exception) wins; an explicit
+        // log carrying an exception is 'exception'; everything else is 'logger'.
+        if (! isset($context['log_type'])) {
+            $logType = LogType::current();
+            if ($e !== null && $logType === LogType::LOGGER) {
+                $logType = LogType::EXCEPTION;
+            }
+            $context['log_type'] = $logType;
+        }
+
         self::contextTypeCorrector($context);
 
         if ($e) {
@@ -154,16 +164,8 @@ class LogManager extends \Illuminate\Log\LogManager
         if (empty($context['file'])) {
             $trace = array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40), 1);
             $context['file'] = self::getFileLine($trace);
-            /** @phpstan-ignore-next-line */
-            if (empty($context['trace']) && $level->value >= Level::Warning) {
-                if ($level->value === Level::Warning) {
-                    $limit = 5;
-                } elseif ($level->value === Level::Warning) {
-                    $limit = 10;
-                } else {
-                    $limit = 20;
-                }
-                $context['trace'] = self::traceToString($trace, $limit);
+            if (empty($context['trace']) && $level->value >= Level::Warning->value) {
+                $context['trace'] = self::traceToString($trace, self::traceDepthForLevel($level));
             }
         }
         if (config('logger.allow_memory', false)) {
@@ -174,6 +176,32 @@ class LogManager extends \Illuminate\Log\LogManager
         $context['request_id'] = self::getOrCreateRequestId();
 
         return mb_substr($message, 0, $this->messageLimit);
+    }
+
+    /**
+     * Trace depth (frames) by level, config-driven (spec §3.7). Replaces the old
+     * broken int-vs-enum comparison block.
+     */
+    protected static function traceDepthForLevel(Level $level): int
+    {
+        /** @var array<string,int> $depth */
+        $depth = (array) config('logger.trace.depth', ['warning' => 5, 'error' => 10, 'critical' => 20]);
+        return match (true) {
+            $level->value >= Level::Critical->value => (int) ($depth['critical'] ?? 20),
+            $level->value >= Level::Error->value => (int) ($depth['error'] ?? 10),
+            default => (int) ($depth['warning'] ?? 5),
+        };
+    }
+
+    /**
+     * Reset the per-request id so the next entrypoint (e.g. the next queue job) gets a
+     * fresh one. Call between units of work; LaraLogServiceProvider wires this to
+     * JobProcessing (spec §5.1, fixes B7).
+     */
+    public static function resetRequestId(): void
+    {
+        unset($_SERVER['HTTP_REQUEST_ID']);
+        putenv('HTTP_REQUEST_ID');
     }
 
     public static function getOrCreateRequestId(): string
@@ -200,8 +228,22 @@ class LogManager extends \Illuminate\Log\LogManager
      */
     public static function contextTypeCorrector(array &$context): void
     {
-        // TODO: str2lower & snak_case
+        // §4.7: optional snake_case of keys (default off). Run BEFORE the reserved-key
+        // switch — the LOGGER_* constants are already lowercase, so they still match.
+        if (config('logger.snake_case', false)) {
+            $normalized = [];
+            foreach ($context as $k => $v) {
+                $normalized[is_string($k) ? Str::snake($k) : $k] = $v;
+            }
+            $context = $normalized;
+        }
+
         foreach ($context as $k => &$r) {
+            // §2: mask credential-ish fields by key name before anything else.
+            if (is_string($k) && Redactor::shouldRedactKey($k)) {
+                $r = Redactor::MASK;
+                continue;
+            }
             switch ($k) {
                 case \LOGGER_TIME:
                 case \LOGGER_STATUS:

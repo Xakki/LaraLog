@@ -176,7 +176,7 @@ At `Warning` and above a stack trace is added automatically. Trace depth scales 
 | Critical / Alert / Emergency | 20                   |
 
 `src/LogManager.php` accepts all 8 PSR-3 methods.
-Vendor/Monolog/Illuminate frames are stripped (`TraitFileTrace`). Making numbers configurable — TODO.
+Vendor/Monolog/Illuminate frames are stripped (`TraitFileTrace`). Depth, the strip list, and the per-argument limit are configurable via `config/logger.php` (`trace.depth`, `trace.excluded_partials`, `trace.arg_limit`).
 
 ---
 
