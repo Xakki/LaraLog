@@ -1,6 +1,15 @@
 ### Decouple log-shaping logic from Laravel globals (config/env/request once, not per-record)
 
-**Criticality:** Medium (architectural; unblocks testability + fixes B9/B7 cleanly)
+> **STATUS: CLOSED / DEPRIORITIZED (2026-05-29, user decision).** The motivating pain is gone:
+> **B9** (null-in-prod) is solved by `config/logger.php` + `ExtraProcessor` reading config once
+> with env fallback; **B7** (request_id leak) is fixed; and the core log-shaping logic is now
+> demonstrably unit-testable (8 tests). The remaining items — `LogConfig` DTO and
+> `RequestContext` seam — buy only micro-perf (~4 array-access config lookups/record) and
+> cosmetics, at the cost of a risky public-API refactor. **Not doing them.** The only piece with
+> any residual value (splitting `appendContext`'s mutate-by-ref + return dual role into a pure
+> `enrichContext()`) is a nice-to-have; reopen this card only if that cleanup is ever wanted.
+
+**Criticality:** ~~Medium~~ → closed (architectural cleanup, superseded by tactical fixes)
 
 **TAGS:**
 - tech-debt

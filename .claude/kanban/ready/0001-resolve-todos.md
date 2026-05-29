@@ -81,14 +81,14 @@ The reference implementation does not yet satisfy parts of the spec it ships:
    `logger.redact` (merged, not replaced). *(was Q3)*
 4. **Config namespace** — `logger.*` (existing package convention), not `config/logging.php`.
 
-**Resolved 2026-05-29:**
+**Resolved 2026-05-29 — all open questions closed:**
 2. **T5** — user chose **Option A** (chained handlers, opt-in `logger.capture_handlers`,
    default OFF) with field name **`log_type`** and spec values `logger|trigger|exception|fatal`.
-
-**Open questions:** *(remaining)*
-5. Scope: §4.7 `db_*` prefix renames in `SqlLogServiceProvider` (`millisecond`→`db_time_ms`,
-   `table`→`db_table`) — **NOT implemented** (breaking field rename, out of TODO scope).
-   Decide: do it (bump/migration) or leave. Currently deferred.
+5. **§4.7 SQL renames — DONE.** User chose conform + fix the config-doc bug:
+   `table`→`db_table`, `millisecond`→`db_time_ms`, `bindings`→`db_bindings`; Readme slow-log
+   keys corrected (`sqlSlowLogAll`/`sqlSlowLogForSelect`). ⚠ breaking for dashboards on old
+   SQL field names. A DB-backed test for `SqlLogServiceProvider` (would also retro-cover B3)
+   remains deferred — needs an sqlite `QueryExecuted` harness.
 
 **Execution Log (2026-05-29) — implemented on branch `feat/resolve-todos-and-review-fixes`:**
 - **T1/T2 ✅** `config/logger.php` `trace.{excluded_partials,depth,arg_limit}`; `TraitFileTrace`
