@@ -50,9 +50,9 @@ class SqlLogServiceProvider extends ServiceProvider
                 }
 
                 Log::channel($logStack)->info($query->sql, [
-                    'table' => $table,
-                    'millisecond' => $milliseconds,
-                    'bindings' => $bind,
+                    'db_table' => $table,
+                    'db_time_ms' => $milliseconds,
+                    'db_bindings' => $bind,
                     'tag' => 'sql',
                     'sql_type' => $sqlType,
                 ]);

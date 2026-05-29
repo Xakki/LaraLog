@@ -92,11 +92,15 @@ class AppServiceProvider extends ServiceProvider
     }
 }
 ```
-2. Add into config/logging.php
+2. Add into config/logging.php (these are the exact keys `SqlLogServiceProvider` reads — the
+   old `sqlSlowLogMs` example was wrong, leaving the threshold at 0 → every query logged):
 ```php
     'dailySqlStack' => env('LOG_DAILY_SQL'),
-    'sqlSlowLogMs' => env('SQL_SLOW_LOG', 500),
+    'sqlSlowLogAll' => (int) env('SQL_SLOW_LOG_ALL', 500),         // ms — all statements
+    'sqlSlowLogForSelect' => (int) env('SQL_SLOW_LOG_FOR_SELECT', 200), // ms — SELECT only
 ```
+Logged fields (spec §6.2): `db_table`, `db_time_ms`, `db_bindings` (only when `APP_DEBUG`,
+≤20 bindings, strings >512 chars elided), `sql_type`, `tag: sql`.
 
 
 ### Syslog UDP channel
