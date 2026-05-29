@@ -5,16 +5,26 @@ permissions:
   contents: read
 
 jobs:
-  phpstan:
+  test:
     runs-on: ubuntu-latest
-    container:
-      image: xakki/laralog-php:8.3
+    name: PHP ${{ matrix.php }}
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Vendor
-        run: composer install
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, sockets
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Run PHPSTAN
         run: composer phpstan
