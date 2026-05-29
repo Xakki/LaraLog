@@ -159,7 +159,7 @@ class LogManager extends \Illuminate\Log\LogManager
             }
         }
 
-        $context['messageLen'] = mb_strlen($message);
+        $context['message_len'] = mb_strlen($message);
 
         if (empty($context['file'])) {
             $trace = array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40), 1);
