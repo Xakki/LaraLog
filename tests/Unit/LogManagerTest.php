@@ -5,6 +5,7 @@ namespace Xakki\LaraLogTests\Unit;
 use Monolog\Processor\LoadAverageProcessor;
 use Monolog\Processor\WebProcessor;
 use Xakki\LaraLog\LogManager;
+use Xakki\LaraLog\Processor\ExtraProcessor;
 use Xakki\LaraLog\Redactor;
 use Xakki\LaraLog\TraitFileTrace;
 use Xakki\LaraLogTests\AbstractTestCase;
@@ -90,6 +91,36 @@ class LogManagerTest extends AbstractTestCase
 
         $error = $this->logToFile('error', 'a problem');
         $this->assertStringContainsString('"trace":', $error);
+    }
+
+    public function testTraceDepthIsConfigurable(): void
+    {
+        // depth 1 -> traceToString appends '***' after the first rendered frame. If B2
+        // regressed (depth hardcoded to 20) this shallow stack would NOT be truncated.
+        $log = $this->logToFile('error', 'deep', [], 'debug', [
+            'logger.trace.depth' => ['warning' => 5, 'error' => 1, 'critical' => 20],
+        ]);
+        $this->assertStringContainsString('***', $log);
+    }
+
+    public function testExtraProcessorReadsConfigStandalone(): void
+    {
+        // The documented usage wires ExtraProcessor into a channel WITHOUT the provider —
+        // it must still surface tier/release from config (regression guard for B9).
+        $this->createApplication();
+        config(['logger.tier' => 'prod', 'logger.release_tag' => 'v1.2.3']);
+
+        $record = new \Monolog\LogRecord(
+            new \DateTimeImmutable(),
+            'test',
+            \Monolog\Level::Info,
+            'hello',
+        );
+        $out = (new ExtraProcessor())($record);
+
+        $this->assertSame('prod', $out->extra['tier']);
+        $this->assertSame('v1.2.3', $out->extra['release_tag']);
+        $this->assertArrayHasKey('log_ver', $out->extra);
     }
 
 
