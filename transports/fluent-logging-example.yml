@@ -10,7 +10,11 @@ x-logging: &_logging
             # 8 MiB — на случай скачка трафика. С 1 MiB при busy connection пакеты dropped.
             fluentd-buffer-limit: 8388608
             fluentd-write-timeout: "100s"
-            # Tag = имя контейнера; используется для Match-блоков fluent-bit (service.*)
+            # Tag = имя контейнера — только входной namespace (service.*). Per-type
+            # парсеры в fluent-bit маршрутизируются по лейблу com.docker.compose.service
+            # (см. rewrite_tag → gl.<service>), а НЕ по имени контейнера. Поэтому контейнеры
+            # можно называть как угодно; важно лишь чтобы compose-имя сервиса было
+            # nginx/redis/mariadb/php (или добавь свой Match gl.<service> в конфиг).
             tag: "service.{{.Name}}"
             # Docker fluentd-driver пробросит env_<NAME> и label_<KEY> в record
             # под оригинальными именами (без префикса). fluent-bit переименует их
