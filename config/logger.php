@@ -11,8 +11,9 @@ declare(strict_types=1);
  * unlike env() called from runtime code, which returns null once config is cached.
  */
 return [
+
     // Max message length (chars) kept on the log record.
-    'messageLimit' => (int) env('LOG_MESSAGE_LIMIT', 3024),
+    'message_limit' => (int) env('LOG_MESSAGE_LIMIT', 3024),
 
     // Attach memory_get_usage()/peak to every record.
     'allow_memory' => (bool) env('LOG_ALLOW_MEMORY', false),
@@ -24,12 +25,8 @@ return [
         'app_env'        => env('APP_ENV'),
         'app_ver'        => env('APP_VERSION'),
         'log_ver'        => LOGGER_VER,
-        'tier'           => env('TIER'),
         'release_tag'    => env('RELEASE_TAG'),
         'release_time'   => env('RELEASE_TIME'),
-        'container_name' => env('CONTAINER_NAME'),
-        'host_ip'        => env('HOST_IP'),
-        'host_name'      => env('HOST_NAME'),
     ],
 
     // ---- Stack trace (spec §3.7 / §4.6) ----

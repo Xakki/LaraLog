@@ -11,45 +11,55 @@ x-logging: &_logging
             fluentd-buffer-limit: 8388608
             fluentd-write-timeout: "100s"
             # Tag = имя контейнера — только входной namespace (service.*). Per-type
-            # парсеры в fluent-bit маршрутизируются по лейблу com.docker.compose.service
-            # (см. rewrite_tag → gl.<service>), а НЕ по имени контейнера. Поэтому контейнеры
-            # можно называть как угодно; важно лишь чтобы compose-имя сервиса было
-            # nginx/redis/mariadb/php (или добавь свой Match gl.<service> в конфиг).
+            # парсеры маршрутизируются по лейблу log_format (см. rewrite_tag → gl.<log_format>),
+            # а НЕ по имени контейнера/сервиса. Контейнеры и сервисы можно называть как угодно;
+            # важно лишь проставить log_format (дефолт = имя compose-сервиса через Copy).
             tag: "service.{{.Name}}"
-            # Docker fluentd-driver пробросит env_<NAME> и label_<KEY> в record
-            # под оригинальными именами (без префикса). fluent-bit переименует их
-            # в канонические поля (app_env, hostname, compose_project, service, tier...).
-            # HOST_IP не нужен — host подставляется глобальным фильтром Add host ${HOST_IP}.
-            env: "APP_ENV,HOST_NAME,COMPOSE_PROFILES"
-            labels: "com.docker.compose.service,com.docker.compose.project,com.docker.compose.image,tier"
+            # Driver пробрасывает перечисленные labels в каждую запись под оригинальными
+            # именами (docker v20+, без префикса label_). fluent-bit переименует их в плоские
+            # docker_* + log_format ([FILTER] modify). env: НЕ используем — host/hostname/
+            # docker_profile fluent-bit ставит глобально из СВОЕГО env (см. ниже environment).
+            labels: "com.docker.compose.service,com.docker.compose.project,com.docker.compose.image,tier,log_format"
 
 
 services:
-    php:
-        <<: *_logging
-        labels:
-            tier: "backend"
-    cron:
-        <<: *_logging
-        labels:
-            tier: "cron"
-    mariadb:
-        <<: *_logging
-        depends_on:
-            fluent-bit:
-                condition: service_started
-    redis:
-        <<: *_logging
-        depends_on:
-            fluent-bit:
-                condition: service_started
-    nginx:
-        <<: *_logging
-        depends_on:
-            php:
-                condition: service_started
-            fluent-bit:
-                condition: service_started
+#    php:
+#        <<: *_logging
+#        labels:
+#            tier: "web"
+#            log_format: "php"
+#    cron:
+#        <<: *_logging
+#        labels:
+#            tier: "app"
+#            log_format: "php"
+#    mariadb:
+#        <<: *_logging
+#        labels:
+#            tier: "db"
+#            log_format: "mariadb"
+#        depends_on:
+#            fluent-bit:
+#                condition: service_started
+#    redis:
+#        <<: *_logging
+#        labels:
+#            tier: "cache"
+#            log_format: "redis"
+#        depends_on:
+#            fluent-bit:
+#                condition: service_started
+#    nginx:
+#        <<: *_logging
+#        labels:
+#            tier: "proxy"
+#            log_format: "nginx"
+#        depends_on:
+#            php:
+#                condition: service_started
+#            fluent-bit:
+#                condition: service_started
+
     fluent-bit:
         image: cr.fluentbit.io/fluent/fluent-bit:latest
         container_name: "${COMPOSE_PROJECT_NAME}-fluent-bit"
@@ -58,16 +68,18 @@ services:
             - "${EXT_FLUENT_PORT}:24224/tcp"
             - "${EXT_FLUENT_METRIC_PORT}:2020" # Порт для метрик / built-in HTTP healthcheck
         volumes:
-            - ./docker/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
-            - ./docker/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
-            - ./docker/fluent-bit/cleanup.lua:/fluent-bit/etc/cleanup.lua:ro
+            # Весь каталог конфигов (fluent-bit.conf, parsers.conf, cleanup.lua,
+            # service.d/*.conf) монтируем целиком — новый service.d-файл подхватывается
+            # без правки compose. Затеняет дефолты образа (их не используем: свой конфиг,
+            # Plugins_File не задан, multiline-парсер mysql встроен в бинарь).
+            - ./docker/fluent-bit:/fluent-bit/etc:ro
             # MariaDB slowlog (mysqld не умеет slowlog в stderr — только файл).
             - ./docker/mariadb/log:/var/log/mysql_logs:ro
             # Универсальный JSON-tail: любые *.ndjson файлы здесь подхватываются
             # автоматически. Имя файла = имя сервиса (см. enrich_jsonfile).
             # Bind точки конкретных сервисов в base/_json_logs/<service>.ndjson
             # из соответствующих контейнеров (или общий host-каталог).
-            - ./base/_json_logs:/var/log/json:ro
+            - ./docker/logs:/var/log/json:ro
             # Persistent state для tail-input'ов (in_tail offset DB).
             # До рефакторинга DB лежала в /tmp — терялась на каждом
             # `docker compose up --force-recreate`, и fluent-bit с
@@ -80,12 +92,10 @@ services:
             - GRAYLOG_HOST=${GRAYLOG_HOST}
             - GRAYLOG_URI=${GRAYLOG_URI}
             - GRAYLOG_PORT=${GRAYLOG_PORT}
-            # Используются Lua-функцией обогащения tail-записей (mariadb-slowlog,
-            # *.ndjson) и фильтром Add host ${HOST_IP} для всех записей.
-            - APP_ENV=${APP_ENV}
             - HOST_NAME=${HOST_NAME}
             - HOST_IP=${HOST_IP}
             - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+            - COMPOSE_PROFILES=${COMPOSE_PROFILES}
         restart: unless-stopped
         # Healthcheck из distroless-образа невозможен (нет curl/wget/sh).
         # Готовность проверяет docker по самой команде fluent-bit + порт 2020 наружу.
@@ -107,7 +117,7 @@ services:
             - ./docker/mariadb/log:/var/log/mysql_logs
             # Ротация *.ndjson из универсального glob-tail (см. fluent-bit.conf).
             # rw нужен logrotate для записи rotated/compressed файлов рядом.
-            - ./base/_json_logs:/var/log/json
+            - ./docker/logs:/var/log/json
             - ./docker/logrotate/logrotate.conf:/etc/logrotate.app.conf:ro
         entrypoint: /bin/sh
         command:

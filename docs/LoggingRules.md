@@ -927,7 +927,7 @@ For new fields — when adding to the §9.3 catalog, check whether an OTel equiv
 With LaraLog you already get:
 
 - Auto-injection of `request_id`, `app_ver`, `host`, memory metrics, release info (`ExtraProcessor`).
-- Size caps for message and the whole line with smart truncation (`LogManager::messageLimit`, `CustomFormatter`).
+- Size caps for message and the whole line with smart truncation (`LogManager::message_limit`, `CustomFormatter`).
 - Exception unwrap with previous chain (`appendContext`).
 - Type coercion in context (`contextTypeCorrector`).
 - File:line of the call site, framework frames stripped (`TraitFileTrace`).

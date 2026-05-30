@@ -927,7 +927,7 @@ tags_allowed:
 При использовании LaraLog уже есть:
 
 - Авто-инжект `request_id`, `app_ver`, `host`, memory-метрик, release-инфы (`ExtraProcessor`).
-- Cap'ы на размер message и целой строки со smart-truncation (`LogManager::messageLimit`, `CustomFormatter`).
+- Cap'ы на размер message и целой строки со smart-truncation (`LogManager::message_limit`, `CustomFormatter`).
 - Exception unwrap с previous-цепочкой (`appendContext`).
 - Type coercion в context (`contextTypeCorrector`).
 - File:line точки вызова, без framework-кадров (`TraitFileTrace`).

@@ -84,7 +84,7 @@ Read **env() inside `config/logger.php`, never at log-time** — config values a
 
 | Key | Default | What |
 |---|---|---|
-| `messageLimit` | `3024` | max message length kept |
+| `message_limit` | `3024` | max message length kept |
 | `allow_memory` | `false` | attach `memory_usage` / `memory_peak` |
 | `extra` | `app_name`/`app_env`/`app_ver`/`log_ver` + `tier`/`release_*`/`container_name`/`host_*` from env | stable per-process fields (§4.2); `ExtraProcessor` copies this whole array onto every record (empty values dropped). Add your own keys here. |
 | `trace.excluded_partials` | `['Monolog','Illuminate/Log/','vendor/']` | frames stripped from `file`/`trace` |

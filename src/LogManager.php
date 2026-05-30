@@ -14,7 +14,7 @@ class LogManager extends \Illuminate\Log\LogManager
     public function __construct($app)
     {
         parent::__construct($app);
-        if ($limit = config('logger.messageLimit')) {
+        if ($limit = config('logger.message_limit')) {
             $this->messageLimit = (int) $limit;
         }
     }

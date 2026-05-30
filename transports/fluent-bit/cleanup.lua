@@ -4,28 +4,27 @@
 
 -- ===========================================================================
 -- 0) Обогащение tail-input записей: у файлов нет container_id/labels от
---    docker fluentd-driver, добавляем service/tier/app_env/hostname/
---    compose_project/container_name/log_source вручную, чтобы в Graylog
---    структура совпадала с docker-input.
+--    docker fluentd-driver, добавляем docker_service/docker_tier/log_format/
+--    docker_project/docker_container/log_source вручную, чтобы в Graylog
+--    структура совпадала с docker-input. host/hostname/docker_profile ставит
+--    глобальный [FILTER] modify Add (одинаково для docker и файлов) — тут не дублируем.
 -- ===========================================================================
-local _ENV_APP_ENV   = os.getenv("APP_ENV")              or "?"
-local _ENV_HOST_NAME = os.getenv("HOST_NAME")            or "?"
-local _ENV_PROJECT   = os.getenv("COMPOSE_PROJECT_NAME") or "?"
 
-local function _fill_common(record, service, tier, cn_suffix)
-    record["service"]         = service
-    record["tier"]             = tier
-    record["app_env"]          = _ENV_APP_ENV
-    record["hostname"]         = _ENV_HOST_NAME
-    record["compose_project"]  = _ENV_PROJECT
-    record["container_name"]   = _ENV_PROJECT .. cn_suffix
+local _ENV_PROJECT = os.getenv("COMPOSE_PROJECT_NAME") or "?"
+
+local function _fill_common(record, service, tier, log_format, cn_suffix)
+    record["docker_service"]   = service
+    record["docker_tier"]      = tier
+    record["log_format"]       = log_format
+    record["docker_project"]   = _ENV_PROJECT
+    record["docker_container"] = _ENV_PROJECT .. cn_suffix
     record["log_source"]       = "file"
 end
 
 -- MariaDB slowlog tail — единственный системный файл, который не уходит в stderr
--- (mysqld не умеет писать slowlog в stdout). Один источник — хардкод 3 полей.
+-- (mysqld не умеет писать slowlog в stdout). Один источник — хардкод полей.
 function enrich_mariadb_tail(tag, ts, record)
-    _fill_common(record, "mariadb", "db", "-mariadb")
+    _fill_common(record, "mariadb", "db", "mariadb-slowlog", "-mariadb")
     return 1, ts, record
 end
 
@@ -45,19 +44,22 @@ function enrich_jsonfile(tag, ts, record)
         basename = tag:gsub("^service%.jsonfile%.?", "")
         if basename == "" then basename = "unknown" end
     end
-    local service = record["service"] or basename
-    local tier    = record["tier"]    or "app"
-    _fill_common(record, service, tier, "-" .. basename)
+    local service    = record["service"]    or basename
+    local tier       = record["tier"]       or "app"
+    local log_format = record["log_format"] or service
+    record["service"] = nil
+    record["tier"]    = nil
+    _fill_common(record, service, tier, log_format, "-" .. basename)
     return 1, ts, record
 end
 
--- 1) Docker fluentd-driver кладёт container_name как "/sa-dev-laravel" (с лидирующим
---    слэшем — наследие старого Docker namespace). Срезаем, чтобы в Graylog было
---    чистое "sa-dev-laravel".
+-- 1) Docker fluentd-driver кладёт имя контейнера как "/matrix_dev-php-1" (с лидирующим
+--    слэшем — наследие старого Docker namespace). Поле уже переименовано в docker_container
+--    (см. [FILTER] modify). Срезаем слэш, чтобы в Graylog было чистое "matrix_dev-php-1".
 function strip_container_name(tag, ts, record)
-    local cn = record["container_name"]
+    local cn = record["docker_container"]
     if type(cn) == "string" and cn:sub(1, 1) == "/" then
-        record["container_name"] = cn:sub(2)
+        record["docker_container"] = cn:sub(2)
         return 1, ts, record
     end
     return 0, ts, record
@@ -120,42 +122,26 @@ function parse_nginx_error_context(tag, ts, record)
 end
 
 -- ===========================================================================
--- Классификация нативного (не-JSON) вывода backend-контейнеров.
+-- Классификация нативного (не-JSON) вывода контейнеров.
 -- ===========================================================================
 -- Приложение (Monolog JsonFormatter, PhpErrorCatcher → StreamStorage и т.п.)
 -- пишет логи строкой NDJSON, её разворачивает [FILTER] parser json_default
 -- и удаляет ключ "log". Если "log" после json_default остался — строка НЕ
 -- JSON: это сырой stderr (PHP Fatal/Stack trace, аварийный вывод до
 -- инициализации err.php, supervisor warnings, отладочный вывод сторонних либ).
--- Помечаем такие записи, чтобы их было видно/фильтровать в Graylog отдельно
--- от структурированных логов. Разделяем по tier (docker label):
---   tier = backend   → fpm   (php-fpm worker stderr)
---   tier = cron      → cli   (php CLI / supervisor / любой long-running)
---   tier = frontend  → cli   (node)
--- Поля:
---   log_kind = "native"      — строка не распарсилась как JSON
---   exec_kind = "fpm"|"cli"  — execution context, откуда пришёл нативный вывод
--- Имена не пересекаются с context_log_type приложения и log_source
--- ("stdout"/"stderr"/"file") — старые Graylog-запросы не ломаются.
-local EXEC_KIND_BY_TIER = {
-    backend  = "fpm",
-    cron     = "cli",
-    frontend = "cli",
-}
-
+-- Помечаем log_kind=native, чтобы такие записи было видно/фильтровать в Graylog
+-- отдельно от структурированных. Имя не пересекается с context_log_type
+-- приложения и log_source ("stdout"/"stderr"/"file") — старые запросы не ломаются.
 function tag_native_stderr(tag, ts, record)
     if record["log"] == nil then return 0, ts, record end
-    local kind = EXEC_KIND_BY_TIER[record["tier"]]
-    if not kind then return 0, ts, record end
-    record["log_kind"]  = "native"
-    record["exec_kind"] = kind
+    record["log_kind"] = "native"
     return 1, ts, record
 end
 
 -- ===========================================================================
 -- Нормализация уровня логирования (Monolog-совместимая шкала)
 -- ===========================================================================
--- Возвращает level_name (DEBUG..EMERGENCY) и level (100..600) для всех записей.
+-- Возвращает level_name (DEBUG..EMERGENCY) и level_php (100..600) для всех записей.
 -- Источник уровня:
 --   1. Laravel/Monolog JSON уже кладёт level + level_name в корень — оставляем.
 --   2. Парсер nginx_error / mariadb_record извлёк level_str ("warn", "Note", ...) — мапим.
@@ -217,17 +203,18 @@ local MARIADB_LEVEL = {
 
 local function set_level(record, name)
     record["level_name"] = name
-    record["level"] = LEVEL_BY_NAME[name]
+    record["level_php"] = LEVEL_BY_NAME[name]
     record["syslog_severity"] = SYSLOG_BY_NAME[name]
 end
 
 function infer_level(tag, ts, record)
-    -- 1) Уже выставлено (Laravel/Monolog JSON).
+    -- 1) Уже выставлено (Laravel/Monolog JSON). Monolog кладёт числовой level
+    -- (Monolog-шкала 100..600) — переносим в level_php, освобождая GELF-зарезервированный
+    -- "level" (туда пойдёт только syslog_severity через Gelf_Level_Key в OUTPUT).
     if record["level_name"] then
         local name = string.upper(tostring(record["level_name"]))
-        if not record["level"] then
-            record["level"] = LEVEL_BY_NAME[name]
-        end
+        record["level_php"] = record["level"] or LEVEL_BY_NAME[name]
+        record["level"] = nil
         record["syslog_severity"] = SYSLOG_BY_NAME[name] or 6
         return 1, ts, record
     end
@@ -289,12 +276,12 @@ local MAX_DEPTH  = 6
 local SEP        = "_"
 -- Ключи, которые НЕ трогаем (служебные, плоские, либо уже строки):
 local SKIP = {
-    container_id = true, container_name = true, log_source = true,
+    container_id = true, docker_container = true, log_source = true,
     short_message = true, message = true, log = true,
-    service = true, compose_project = true, image = true,
-    tier = true, app_env = true, machine = true,
-    project = true, profile = true, level = true, level_name = true,
-    syslog_severity = true,
+    docker_service = true, docker_project = true, docker_image = true,
+    docker_tier = true, docker_profile = true,
+    log_format = true, log_kind = true,
+    level_php = true, level_name = true, syslog_severity = true,
     channel = true, datetime = true, ["@timestamp"] = true,
 }
 
@@ -467,10 +454,22 @@ local function _coalesce_short_message(record)
 end
 
 function normalize_event_time(tag, ts, record)
-    local new_ts = parse_iso8601(record["datetime"])
-                or parse_nginx_time(record["time_local"])
+    local dt = record["datetime"]
+    local iso = parse_iso8601(dt)
+    local new_ts = iso or parse_nginx_time(record["time_local"])
 
     local changed = false
+
+    -- Не-ISO "datetime" (nginx "2026/05/30 ..", keydb "30 Apr 2026 ..", mariadb
+    -- "2026-04-30 12:34:56") под именем "datetime" ломает OpenSearch date-mapping
+    -- → Graylog показывает "Invalid date" (и роняет bulk-вставку при первом mapping).
+    -- Кладём такой формат в keyword-safe "datetime_raw". ISO8601 (php/Monolog)
+    -- оставляем как есть — валидная date, event-ts из неё уже снят выше.
+    if dt ~= nil and iso == nil then
+        record["datetime_raw"] = dt
+        record["datetime"] = nil
+        changed = true
+    end
 
     -- Стороннее top-level "timestamp" → "timestamp_raw" (чтобы Graylog не
     -- трактовал как GELF-mandatory и не валил запись типом string).

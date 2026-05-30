@@ -39,7 +39,7 @@ The reference implementation does not yet satisfy parts of the spec it ships:
 
 - **T1 + T2 (config-driven trace) — one unit.**
   Read `$excludedPartials`, trace-depth-by-level map, and the per-arg 128-char cap from
-  `config('logger.*')` (the package already reads `logger.messageLimit` / `logger.allow_memory`,
+  `config('logger.*')` (the package already reads `logger.message_limit` / `logger.allow_memory`,
   so keep the `logger.` namespace, not `logging.php`). Ship sane defaults so behavior is
   unchanged when unset. Fix the buggy depth block while here — see card `0002` (the
   `Level::Warning` duplicate/enum-comparison bug); T2 and that bug touch the same lines.
