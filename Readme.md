@@ -1,14 +1,35 @@
 
-# Integration
+# LaraLog
 
-* [Graylog](./docs/Graylog.md)
+Structured production logging for Laravel — a drop-in `LogManager`, custom drivers, formatters
+and Monolog processors that enrich every record and keep it safe and queryable.
 
+# Documentation
+
+* [Logging Rules](./docs/LoggingRules.md) ([RU](./docs/LoggingRules.ru.md)) — language-agnostic spec for production logging; LaraLog as the reference PHP/Laravel implementation
+* [Graylog integration](./docs/Graylog.md)
+* [Python logging via fluent-bit](./docs/PhytonLog.md) — shipping Python stdlib `logging` into the same Graylog GELF pipeline (direct GELF + fluent-bit text-parse paths)
+
+# What you get
+
+The custom `LogManager` enriches every record (see `appendContext`):
+
+* `log_type` — who emitted it: `logger` (code) / `trigger` (PHP error) / `exception` / `fatal` (spec §4.3.1)
+* `request_id` — per-request correlation id (from `X-Request-ID` or generated), reset per queue job
+* `file` + `trace` — call site and a stack trace whose depth scales with level (vendor/Monolog/Illuminate frames stripped)
+* `message_len`, and `memory_usage`/`memory_peak` when `allow_memory` is on
+* type coercion of context values (`*_id`→int, `is_*`→bool, …) and optional `snake_case` of keys
+* **credential redaction** — `password`/`token`/`api_key`/… masked to `***` by field name, on by default
+
+Plus the `ExtraProcessor` adds stable per-process fields (`app_name`, `app_env`, `app_ver`,
+`log_ver`, `tier`, `release_*`, `host_*`, …) from `config('logger.extra')`.
 
 # Requires
 
-* php: ^8.3|^8.4
-* laravel/framework: ^10|^11
+* php: ^8.3 | ^8.4 | ^8.5
+* laravel/framework: ^10 | ^11 | ^12
 * psr/log: ^3.0
+* ext-mbstring
 
 
 # Install
@@ -40,6 +61,45 @@ or `bootstrap/app.php`
         \Xakki\LaraLog\LogManager::class
     );
 ```
+
+## Configuration (`config/logger.php`)
+
+**Recommended:** register the provider. It merges config defaults, resets `request_id` per
+queue job, and (opt-in) installs the `log_type` capture handlers:
+
+```php
+$this->app->register(\Xakki\LaraLog\LaraLogServiceProvider::class);
+```
+
+Without it (and without a published `config/logger.php`) `ExtraProcessor` has no
+`config('logger.extra')` to read, so the per-process `extra` fields are omitted.
+
+Publish the config to tune it:
+
+```
+php artisan vendor:publish --tag=laralog-config
+```
+
+Read **env() inside `config/logger.php`, never at log-time** — config values are baked in by
+`php artisan config:cache`, while a runtime `env()` returns null once config is cached.
+
+| Key | Default | What |
+|---|---|---|
+| `message_limit` | `3024` | max message length kept |
+| `allow_memory` | `false` | attach `memory_usage` / `memory_peak` |
+| `extra` | `app_name`/`app_env`/`app_ver`/`log_ver` + `tier`/`release_*`/ from env | stable per-process fields (§4.2); `ExtraProcessor` copies this whole array onto every record (empty values dropped). Add your own keys here. |
+| `trace.excluded_partials` | `['Monolog','Illuminate/Log/','vendor/']` | frames stripped from `file`/`trace` |
+| `trace.depth` | `warning:5, error:10, critical:20` | stack-trace frames by level (§3.7) |
+| `trace.arg_limit` | `128` | max chars per stringified trace arg |
+| `redact` | `[]` | extra secret needles, **merged** with the built-in denylist (§2) |
+| `snake_case` | `false` | lowercase + snake_case context keys (§4.7); **breaking — opt-in** |
+| `capture_handlers` | `false` | install chained error/exception/shutdown handlers to set `log_type` (§4.3.1) |
+
+> **`capture_handlers`** installs global PHP handlers chained to the framework's. Enable it
+> only after exercising your error / exception / fatal paths — see `docs/LoggingRules.md` §4.3.1.
+> Credential redaction (`redact` + built-ins) is **on by default**; `password`, `token`,
+> `api_key`, `authorization`, `cookie`, … are masked to `***` by field name.
+
 ### Slow SQL query collect
 
 1. Add `Providers/AppServiceProvider.php`
@@ -55,11 +115,15 @@ class AppServiceProvider extends ServiceProvider
     }
 }
 ```
-2. Add into config/logging.php
+2. Add into config/logging.php (these are the exact keys `SqlLogServiceProvider` reads — the
+   old `sqlSlowLogMs` example was wrong, leaving the threshold at 0 → every query logged):
 ```php
     'dailySqlStack' => env('LOG_DAILY_SQL'),
-    'sqlSlowLogMs' => env('SQL_SLOW_LOG', 500),
+    'sqlSlowLogAll' => (int) env('SQL_SLOW_LOG_ALL', 500),         // ms — all statements
+    'sqlSlowLogForSelect' => (int) env('SQL_SLOW_LOG_FOR_SELECT', 200), // ms — SELECT only
 ```
+Logged fields (spec §6.2): `db_table`, `db_time_ms`, `db_bindings` (only when `APP_DEBUG`,
+≤20 bindings, strings >512 chars elided), `sql_type`, `tag: sql`.
 
 
 ### Syslog UDP channel
@@ -104,8 +168,8 @@ By default, the log size is limited to 1400 characters - a longer log will be lo
             'formatter'    => \Monolog\Formatter\JsonFormatter::class,
             'processors' => [
                 \Xakki\LaraLog\Processor\ExtraProcessor::class, 
-                \Xakki\LaraLog\Processor\LoadAverageProcessor::class,
-                \Xakki\LaraLog\Processor\WebProcessor::class
+                \Monolog\Processor\LoadAverageProcessor::class,
+                \Monolog\Processor\WebProcessor::class
             ],
         ],
 ```
@@ -124,8 +188,8 @@ By default, the log size is limited to 1400 characters - a longer log will be lo
             'capSize' => env('REDIS_LOG_CAP_SIZE', 10000),
             'processors' => [
                 \Xakki\LaraLog\Processor\ExtraProcessor::class, 
-                \Xakki\LaraLog\Processor\LoadAverageProcessor::class,
-                \Xakki\LaraLog\Processor\WebProcessor::class
+                \Monolog\Processor\LoadAverageProcessor::class,
+                \Monolog\Processor\WebProcessor::class
             ],
         ],
 ```
@@ -177,7 +241,7 @@ U can add custom  options, like `LOG_REDIS_PREFIX`, `LOG_REDIS_PORT` and etc
 ```php
 'stack' => [
     'driver' => 'stack',
-    'channels' => ['stderr', 'syslog-udp'],
+    'channels' => ['stderr'],
     //'ignore_exceptions' => true,
 ],
 ```

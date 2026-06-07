@@ -2,6 +2,7 @@
 
 namespace Xakki\LaraLog;
 
+use Illuminate\Support\Str;
 use Monolog\Level;
 
 class LogManager extends \Illuminate\Log\LogManager
@@ -13,7 +14,7 @@ class LogManager extends \Illuminate\Log\LogManager
     public function __construct($app)
     {
         parent::__construct($app);
-        if ($limit = config('logger.messageLimit')) {
+        if ($limit = config('logger.message_limit')) {
             $this->messageLimit = (int) $limit;
         }
     }
@@ -131,6 +132,17 @@ class LogManager extends \Illuminate\Log\LogManager
             $e = $context['exception'];
             unset($context['exception']);
         }
+
+        // §4.3.1 log_type: a handler-set origin (trigger/fatal/exception) wins; an explicit
+        // log carrying an exception is 'exception'; everything else is 'logger'.
+        if (! isset($context['log_type'])) {
+            $logType = LogType::current();
+            if ($e !== null && $logType === LogType::LOGGER) {
+                $logType = LogType::EXCEPTION;
+            }
+            $context['log_type'] = $logType;
+        }
+
         self::contextTypeCorrector($context);
 
         if ($e) {
@@ -147,18 +159,67 @@ class LogManager extends \Illuminate\Log\LogManager
             }
         }
 
-        $context['messageLen'] = mb_strlen($message);
+        $context['message_len'] = mb_strlen($message);
 
         if (empty($context['file'])) {
             $trace = array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40), 1);
             $context['file'] = self::getFileLine($trace);
-            /** @phpstan-ignore-next-line */
-            if (empty($context['trace']) && $level->value >= Level::Warning) {
-                $context['trace'] = self::traceToString($trace, 10);
+            if (empty($context['trace']) && $level->value >= Level::Warning->value) {
+                $context['trace'] = self::traceToString($trace, self::traceDepthForLevel($level));
             }
         }
+        if (config('logger.allow_memory', false)) {
+            $context[\LOGGER_MEMORY_PEAK] = memory_get_peak_usage();
+            $context[\LOGGER_MEMORY] = memory_get_usage();
+        }
+
+        $context['request_id'] = self::getOrCreateRequestId();
 
         return mb_substr($message, 0, $this->messageLimit);
+    }
+
+    /**
+     * Trace depth (frames) by level, config-driven (spec §3.7). Replaces the old
+     * broken int-vs-enum comparison block.
+     */
+    protected static function traceDepthForLevel(Level $level): int
+    {
+        /** @var array<string,int> $depth */
+        $depth = (array) config('logger.trace.depth', ['warning' => 5, 'error' => 10, 'critical' => 20]);
+        return match (true) {
+            $level->value >= Level::Critical->value => (int) ($depth['critical'] ?? 20),
+            $level->value >= Level::Error->value => (int) ($depth['error'] ?? 10),
+            default => (int) ($depth['warning'] ?? 5),
+        };
+    }
+
+    /**
+     * Reset the per-request id so the next entrypoint (e.g. the next queue job) gets a
+     * fresh one. Call between units of work; LaraLogServiceProvider wires this to
+     * JobProcessing (spec §5.1, fixes B7).
+     */
+    public static function resetRequestId(): void
+    {
+        unset($_SERVER['HTTP_REQUEST_ID']);
+        putenv('HTTP_REQUEST_ID');
+    }
+
+    public static function getOrCreateRequestId(): string
+    {
+        if (empty($_SERVER['HTTP_REQUEST_ID'])) {
+            if (! empty($_SERVER['HTTP_X_REQUEST_ID'])) {
+                $id = $_SERVER['HTTP_X_REQUEST_ID'];
+            } else {
+                $id = Str::uuid();
+            }
+            $_SERVER['HTTP_REQUEST_ID'] = (string) $id;
+        }
+
+        if (! env('HTTP_REQUEST_ID')) {
+            putenv('HTTP_REQUEST_ID=' . $_SERVER['HTTP_REQUEST_ID']);
+        }
+
+        return $_SERVER['HTTP_REQUEST_ID'];
     }
 
     /**
@@ -167,7 +228,22 @@ class LogManager extends \Illuminate\Log\LogManager
      */
     public static function contextTypeCorrector(array &$context): void
     {
+        // §4.7: optional snake_case of keys (default off). Run BEFORE the reserved-key
+        // switch — the LOGGER_* constants are already lowercase, so they still match.
+        if (config('logger.snake_case', false)) {
+            $normalized = [];
+            foreach ($context as $k => $v) {
+                $normalized[Str::snake((string) $k)] = $v;
+            }
+            $context = $normalized;
+        }
+
         foreach ($context as $k => &$r) {
+            // §2: mask credential-ish fields by key name before anything else.
+            if (Redactor::shouldRedactKey((string) $k)) {
+                $r = Redactor::MASK;
+                continue;
+            }
             switch ($k) {
                 case \LOGGER_TIME:
                 case \LOGGER_STATUS:
@@ -183,8 +259,8 @@ class LogManager extends \Illuminate\Log\LogManager
                     continue 2;
             }
             if (
-                str_contains($k, '_id') || str_contains($k, 'Id') || str_contains($k, '_cnt')
-                || str_contains($k, '_count') || str_contains($k, 'Size')
+                str_contains($k, '_id') || str_contains($k, 'cnt')
+                || str_contains($k, 'count') || str_contains($k, 'size')
             ) {
                 $r = (int) $r;
             } elseif (str_contains($k, 'is_') || str_contains($k, 'has_') || str_contains($k, 'flag')) {

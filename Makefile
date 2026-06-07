@@ -4,6 +4,9 @@ SHELL = /bin/bash
 include .env
 export
 
+HOST_NAME := $(shell hostname)
+HOST_IP  := $(shell hostname -I 2>/dev/null | awk '{print $$1}' || echo unknown)
+
 docker := docker run -it -v $(PWD):/app ${DOCKER_USER}/${TAG}
 composer := $(docker) composer
 

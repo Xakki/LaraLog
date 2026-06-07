@@ -3,3 +3,4 @@
 .phpcs-cache
 /.env
 /composer.lock
+/.claude
